@@ -1,4 +1,5 @@
 export const STORAGE_KEYS = {
+  doctors: "icu-hrm:v1:doctors",
   rosterSnapshots: "icu-hrm:v1:roster-snapshots",
   auditLogs: "icu-hrm:v1:audit-logs",
   offRequests: "icu-hrm:v1:off-requests",

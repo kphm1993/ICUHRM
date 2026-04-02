@@ -184,19 +184,7 @@ export function generateRoster(
     shiftTypes: input.shiftTypes,
     weekendGroupSchedule: input.weekendGroupSchedule
   })].sort(compareShiftsForAssignment);
-
-  const eligibilityByShiftId = new Map<string, ReturnType<typeof checkShiftEligibility>>();
-
-  for (const shift of shifts) {
-    const eligibility = checkShiftEligibility({
-      shift,
-      doctors: input.doctors,
-      leaves: input.leaves,
-      weekendGroupSchedule: input.weekendGroupSchedule
-    });
-    eligibilityByShiftId.set(shift.id, eligibility);
-    fairnessState = recordEligibilityForShift(fairnessState, shift, eligibility);
-  }
+  const shiftsById = new Map(shifts.map((shift) => [shift.id, shift] as const));
 
   if (toYearMonthString(input.range.startDate) !== toYearMonthString(input.range.endDate)) {
     warnings.add(
@@ -205,7 +193,15 @@ export function generateRoster(
   }
 
   for (const shift of shifts) {
-    const eligibility = eligibilityByShiftId.get(shift.id) ?? [];
+    const eligibility = checkShiftEligibility({
+      shift,
+      doctors: input.doctors,
+      leaves: input.leaves,
+      currentAssignments: assignments,
+      shiftsById,
+      weekendGroupSchedule: input.weekendGroupSchedule
+    });
+    fairnessState = recordEligibilityForShift(fairnessState, shift, eligibility);
 
     const candidateScores = scoreCandidates({
       shift,

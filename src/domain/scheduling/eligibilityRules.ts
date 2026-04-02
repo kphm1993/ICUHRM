@@ -1,11 +1,17 @@
 import type {
+  Assignment,
   Doctor,
   Leave,
   Shift,
   WeekendGroup,
   WeekendGroupScheduleEntry
 } from "@/domain/models";
-import { getWeekendStartDate } from "@/domain/scheduling/dateUtils";
+import {
+  addDays,
+  getWeekendStartDate,
+  parseIsoDate,
+  toIsoDate
+} from "@/domain/scheduling/dateUtils";
 
 function isDateWithinInclusive(
   date: string,
@@ -102,4 +108,83 @@ export function evaluateFridayNightRule(
   return doctor.weekendGroup === offGroup
     ? "Doctor belongs to the weekend-off group for this Friday night shift."
     : null;
+}
+
+export function evaluateOneShiftPerDayRule(
+  doctor: Pick<Doctor, "id">,
+  shift: Pick<Shift, "date" | "type">,
+  assignments: ReadonlyArray<Pick<Assignment, "assignedDoctorId" | "shiftId">>,
+  shiftsById: ReadonlyMap<string, Pick<Shift, "date" | "type">>
+): string | null {
+  if (shift.type !== "DAY" && shift.type !== "NIGHT") {
+    return null;
+  }
+
+  const conflictingAssignment = assignments.find((assignment) => {
+    if (assignment.assignedDoctorId !== doctor.id) {
+      return false;
+    }
+
+    const assignedShift = shiftsById.get(assignment.shiftId);
+
+    if (!assignedShift) {
+      return false;
+    }
+
+    if (assignedShift.date !== shift.date) {
+      return false;
+    }
+
+    if (assignedShift.type !== "DAY" && assignedShift.type !== "NIGHT") {
+      return false;
+    }
+
+    return assignedShift.type !== shift.type;
+  });
+
+  if (!conflictingAssignment) {
+    return null;
+  }
+
+  const conflictingShift = shiftsById.get(conflictingAssignment.shiftId);
+  const conflictingShiftLabel =
+    conflictingShift?.type === "DAY"
+      ? "day"
+      : conflictingShift?.type === "NIGHT"
+        ? "night"
+        : "same-day";
+
+  return `Doctor already has a ${conflictingShiftLabel} shift assignment on ${shift.date}.`;
+}
+
+export function evaluateRestAfterNightShiftRule(
+  doctor: Pick<Doctor, "id">,
+  shift: Pick<Shift, "date" | "type">,
+  assignments: ReadonlyArray<Pick<Assignment, "assignedDoctorId" | "shiftId">>,
+  shiftsById: ReadonlyMap<string, Pick<Shift, "date" | "type">>
+): string | null {
+  if (shift.type !== "DAY" && shift.type !== "NIGHT") {
+    return null;
+  }
+
+  const previousDate = toIsoDate(addDays(parseIsoDate(shift.date), -1));
+  const previousNightAssignment = assignments.find((assignment) => {
+    if (assignment.assignedDoctorId !== doctor.id) {
+      return false;
+    }
+
+    const assignedShift = shiftsById.get(assignment.shiftId);
+
+    if (!assignedShift) {
+      return false;
+    }
+
+    return assignedShift.date === previousDate && assignedShift.type === "NIGHT";
+  });
+
+  if (!previousNightAssignment) {
+    return null;
+  }
+
+  return `Doctor must rest on ${shift.date} after working a night shift on ${previousDate}.`;
 }

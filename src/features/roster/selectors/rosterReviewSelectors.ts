@@ -59,6 +59,36 @@ function findWeekdayPairBiasLedger(
   return entries.find((entry) => entry.doctorId === doctorId) ?? null;
 }
 
+function buildDisplayDoctorRecords(input: {
+  readonly doctors: ReadonlyArray<Doctor>;
+  readonly snapshot: RosterSnapshot | null;
+}): ReadonlyArray<{
+  readonly doctorId: string;
+  readonly name: string;
+}> {
+  const records = new Map<string, { readonly doctorId: string; readonly name: string }>();
+
+  for (const reference of input.snapshot?.doctorReferences ?? []) {
+    records.set(reference.doctorId, {
+      doctorId: reference.doctorId,
+      name: reference.name
+    });
+  }
+
+  for (const doctor of input.doctors) {
+    if (!records.has(doctor.id)) {
+      records.set(doctor.id, {
+        doctorId: doctor.id,
+        name: doctor.name
+      });
+    }
+  }
+
+  return Array.from(records.values()).sort((left, right) =>
+    left.name.localeCompare(right.name)
+  );
+}
+
 export function buildRosterDoctorSummaryRows(input: {
   readonly doctors: ReadonlyArray<Doctor>;
   readonly snapshot: RosterSnapshot | null;
@@ -68,12 +98,14 @@ export function buildRosterDoctorSummaryRows(input: {
   const shiftsById = new Map(
     (input.snapshot?.shifts ?? []).map((shift) => [shift.id, shift] as const)
   );
+  const displayDoctors = buildDisplayDoctorRecords({
+    doctors: input.doctors,
+    snapshot: input.snapshot
+  });
 
-  return [...input.doctors]
-    .sort((left, right) => left.name.localeCompare(right.name))
-    .map((doctor) => {
+  return displayDoctors.map((doctor) => {
       const matchingAssignments = (input.snapshot?.assignments ?? []).filter(
-        (assignment) => assignment.assignedDoctorId === doctor.id
+        (assignment) => assignment.assignedDoctorId === doctor.doctorId
       );
 
       let weekdayDay = 0;
@@ -108,22 +140,22 @@ export function buildRosterDoctorSummaryRows(input: {
         }
       }
 
-      const currentBiasLedger = findBiasLedger(input.currentBias, doctor.id);
+      const currentBiasLedger = findBiasLedger(input.currentBias, doctor.doctorId);
       const projectedBiasLedger = findBiasLedger(
         input.snapshot?.updatedBias ?? [],
-        doctor.id
+        doctor.doctorId
       );
       const currentWeekdayPairBiasLedger = findWeekdayPairBiasLedger(
         input.currentWeekdayPairBias,
-        doctor.id
+        doctor.doctorId
       );
       const projectedWeekdayPairBiasLedger = findWeekdayPairBiasLedger(
         input.snapshot?.updatedWeekdayPairBias ?? [],
-        doctor.id
+        doctor.doctorId
       );
 
       return {
-        doctorId: doctor.id,
+        doctorId: doctor.doctorId,
         doctorName: doctor.name,
         totalAssigned: matchingAssignments.length,
         weekdayDay,

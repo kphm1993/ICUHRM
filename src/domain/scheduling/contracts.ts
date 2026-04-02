@@ -50,6 +50,8 @@ export type ValidationIssueCode =
   | "SHIFT_UNASSIGNED"
   | "SHIFT_MULTI_ASSIGNED"
   | "ASSIGNMENT_ON_LEAVE"
+  | "ASSIGNMENT_SAME_DAY_CONFLICT"
+  | "ASSIGNMENT_REST_AFTER_NIGHT_VIOLATION"
   | "ASSIGNMENT_WEEKEND_OFF_GROUP"
   | "ASSIGNMENT_FRIDAY_NIGHT_OFF_GROUP"
   | "MISSING_WEEKEND_GROUP_SCHEDULE";
@@ -107,6 +109,8 @@ export interface CheckEligibilityInput {
   readonly shift: Shift;
   readonly doctors: ReadonlyArray<Doctor>;
   readonly leaves: ReadonlyArray<Leave>;
+  readonly currentAssignments: ReadonlyArray<Assignment>;
+  readonly shiftsById: ReadonlyMap<EntityId, Shift>;
   readonly weekendGroupSchedule: ReadonlyArray<WeekendGroupScheduleEntry>;
 }
 

@@ -17,13 +17,13 @@ import { createOffRequestService } from "@/features/offRequests/services/offRequ
 import { createRosterWorkflowService } from "@/features/roster/services/rosterWorkflowService";
 import { createShiftTypeManagementService } from "@/features/shifts/services/shiftTypeManagementService";
 import {
-  InMemoryDoctorRepository,
   InMemoryLeaveRepository,
   InMemoryShiftTypeRepository
 } from "@/infrastructure/repositories/inMemory";
 import {
   LocalStorageAuditLogRepository,
   LocalStorageBiasLedgerRepository,
+  LocalStorageDoctorRepository,
   LocalStorageOffRequestRepository,
   LocalStorageRosterSnapshotRepository,
   LocalStorageWeekdayPairBiasLedgerRepository
@@ -40,7 +40,9 @@ export interface AppServices {
 }
 
 function createAppServices(): AppServices {
-  const doctorRepository = new InMemoryDoctorRepository(ROSTER_SEED_DOCTORS);
+  const doctorRepository = new LocalStorageDoctorRepository({
+    seedData: ROSTER_SEED_DOCTORS
+  });
   const leaveRepository = new InMemoryLeaveRepository(ROSTER_SEED_LEAVES);
   const shiftTypeRepository = new InMemoryShiftTypeRepository(ROSTER_SEED_SHIFT_TYPES);
   const rosterSnapshotRepository = new LocalStorageRosterSnapshotRepository({
@@ -59,18 +61,24 @@ function createAppServices(): AppServices {
     new LocalStorageWeekdayPairBiasLedgerRepository({
       seedData: ROSTER_SEED_WEEKDAY_PAIR_BIAS_LEDGERS
     });
+  const auditLogService = createAuditLogService({
+    auditLogRepository
+  });
 
   const doctorManagementService = createDoctorManagementService({
-    doctorRepository
+    doctorRepository,
+    leaveRepository,
+    offRequestRepository,
+    biasLedgerRepository,
+    weekdayPairBiasLedgerRepository,
+    rosterSnapshotRepository,
+    auditLogService
   });
   const leaveManagementService = createLeaveManagementService({
     leaveRepository
   });
   const shiftTypeManagementService = createShiftTypeManagementService({
     shiftTypeRepository
-  });
-  const auditLogService = createAuditLogService({
-    auditLogRepository
   });
   const offRequestService = createOffRequestService({
     offRequestRepository,

@@ -42,6 +42,14 @@ export class InMemoryBiasLedgerRepository implements BiasLedgerRepository {
     return sortBiasLedgers(entries).map(cloneBiasLedger);
   }
 
+  async listByDoctor(doctorId: string): Promise<ReadonlyArray<BiasLedger>> {
+    const entries = Array.from(this.entriesById.values()).filter(
+      (entry) => entry.doctorId === doctorId
+    );
+
+    return sortBiasLedgers(entries).map(cloneBiasLedger);
+  }
+
   async findByDoctorAndMonth(
     doctorId: string,
     effectiveMonth: string
@@ -99,4 +107,3 @@ export class InMemoryBiasLedgerRepository implements BiasLedgerRepository {
     }
   }
 }
-

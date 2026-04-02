@@ -95,6 +95,16 @@ export interface RosterWorkflowServiceDependencies {
   readonly auditLogService: AuditLogService;
 }
 
+function buildRosterDoctorReferences(doctors: ReadonlyArray<Doctor>) {
+  return doctors.map((doctor) => ({
+    doctorId: doctor.id,
+    name: doctor.name,
+    uniqueIdentifier: doctor.uniqueIdentifier,
+    weekendGroup: doctor.weekendGroup,
+    isActive: doctor.isActive
+  }));
+}
+
 function findLatestSnapshotByStatus(
   snapshots: ReadonlyArray<RosterSnapshot>,
   status: Roster["status"]
@@ -198,6 +208,9 @@ function createLifecycleSnapshot(
         ...entry
       }))
     },
+    doctorReferences: sourceSnapshot.doctorReferences.map((reference) => ({
+      ...reference
+    })),
     shifts,
     assignments,
     warnings: [...sourceSnapshot.warnings],
@@ -380,6 +393,7 @@ export function createRosterWorkflowService(
           weekendGroupSchedule: monthContext.weekendGroupSchedule,
           notes: input.notes
         },
+        doctorReferences: buildRosterDoctorReferences(monthContext.activeDoctors),
         shifts: result.shifts,
         assignments: result.assignments,
         warnings: result.warnings,

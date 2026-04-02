@@ -53,6 +53,16 @@ export class InMemoryWeekdayPairBiasLedgerRepository
     return sortWeekdayPairBiasLedgers(entries).map(cloneWeekdayPairBiasLedger);
   }
 
+  async listByDoctor(
+    doctorId: string
+  ): Promise<ReadonlyArray<WeekdayPairBiasLedger>> {
+    const entries = Array.from(this.entriesById.values()).filter(
+      (entry) => entry.doctorId === doctorId
+    );
+
+    return sortWeekdayPairBiasLedgers(entries).map(cloneWeekdayPairBiasLedger);
+  }
+
   async findByDoctorAndMonth(
     doctorId: string,
     effectiveMonth: string
@@ -110,4 +120,3 @@ export class InMemoryWeekdayPairBiasLedgerRepository
     }
   }
 }
-

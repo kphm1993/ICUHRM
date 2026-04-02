@@ -2,6 +2,7 @@ import type {
   Assignment,
   BiasLedger,
   GeneratedRosterInputSummary,
+  RosterSnapshotDoctorReference,
   RosterSnapshot,
   Shift,
   WeekdayPairBiasLedger
@@ -27,6 +28,12 @@ function cloneShift(shift: Shift): Shift {
 
 function cloneAssignment(assignment: Assignment): Assignment {
   return { ...assignment };
+}
+
+function cloneDoctorReference(
+  reference: RosterSnapshotDoctorReference
+): RosterSnapshotDoctorReference {
+  return { ...reference };
 }
 
 function cloneBiasLedger(entry: BiasLedger): BiasLedger {
@@ -72,6 +79,7 @@ function cloneRosterSnapshot(snapshot: RosterSnapshot): RosterSnapshot {
         ...entry
       }))
     },
+    doctorReferences: (snapshot.doctorReferences ?? []).map(cloneDoctorReference),
     shifts: snapshot.shifts.map(cloneShift),
     assignments: snapshot.assignments.map(cloneAssignment),
     warnings: [...snapshot.warnings],

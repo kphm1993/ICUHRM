@@ -45,6 +45,14 @@ export class LocalStorageBiasLedgerRepository implements BiasLedgerRepository {
     return sortBiasLedgers(entries).map(cloneBiasLedger);
   }
 
+  async listByDoctor(doctorId: string): Promise<ReadonlyArray<BiasLedger>> {
+    const entries = this.readEntries().filter(
+      (entry) => entry.doctorId === doctorId
+    );
+
+    return sortBiasLedgers(entries).map(cloneBiasLedger);
+  }
+
   async findByDoctorAndMonth(
     doctorId: string,
     effectiveMonth: string

@@ -33,7 +33,18 @@ function resolveShiftCardClasses(shift: Shift): string {
 }
 
 export function RosterCalendar(props: RosterCalendarProps) {
-  const doctorsById = new Map(props.doctors.map((doctor) => [doctor.id, doctor] as const));
+  const doctorNamesById = new Map<string, string>();
+
+  for (const reference of props.snapshot.doctorReferences) {
+    doctorNamesById.set(reference.doctorId, reference.name);
+  }
+
+  for (const doctor of props.doctors) {
+    if (!doctorNamesById.has(doctor.id)) {
+      doctorNamesById.set(doctor.id, doctor.name);
+    }
+  }
+
   const assignmentsByShiftId = new Map(
     props.snapshot.assignments.map((assignment) => [assignment.shiftId, assignment] as const)
   );
@@ -76,8 +87,8 @@ export function RosterCalendar(props: RosterCalendarProps) {
             <div className="mt-3 space-y-3">
               {shifts.map((shift) => {
                 const assignment = assignmentsByShiftId.get(shift.id);
-                const doctor = assignment
-                  ? doctorsById.get(assignment.assignedDoctorId)
+                const doctorName = assignment
+                  ? doctorNamesById.get(assignment.assignedDoctorId) ?? null
                   : null;
 
                 return (
@@ -105,8 +116,8 @@ export function RosterCalendar(props: RosterCalendarProps) {
                     </div>
 
                     <div className="mt-3 rounded-xl bg-white/80 px-3 py-2 text-sm text-slate-700">
-                      {doctor ? (
-                        <span className="font-medium text-slate-900">{doctor.name}</span>
+                      {doctorName ? (
+                        <span className="font-medium text-slate-900">{doctorName}</span>
                       ) : (
                         <span className="font-medium text-rose-700">Unassigned</span>
                       )}

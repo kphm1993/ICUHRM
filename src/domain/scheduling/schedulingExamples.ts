@@ -1,4 +1,5 @@
 import type {
+  Assignment,
   BiasLedger,
   Doctor,
   Leave,
@@ -18,6 +19,7 @@ import {
 import { generateRoster } from "@/domain/scheduling/generateRoster";
 import { generateShiftPool } from "@/domain/scheduling/generateShiftPool";
 import { scoreCandidates } from "@/domain/scheduling/scoreCandidates";
+import { validateGeneratedRoster } from "@/domain/scheduling/validateRoster";
 
 const EXAMPLE_SHIFT_TYPES: ReadonlyArray<ShiftType> = [
   {
@@ -61,6 +63,10 @@ const CLASSIFICATION_SHIFTS = generateShiftPool({
   weekendGroupSchedule: EXAMPLE_WEEKEND_SCHEDULE
 });
 
+const CLASSIFICATION_SHIFTS_BY_ID = new Map(
+  CLASSIFICATION_SHIFTS.map((shift) => [shift.id, shift] as const)
+);
+
 const WEEKDAY_PAIR_CLASSIFICATION_SHIFTS = generateShiftPool({
   rosterId: "weekday-pair-example-roster",
   range: {
@@ -70,6 +76,20 @@ const WEEKDAY_PAIR_CLASSIFICATION_SHIFTS = generateShiftPool({
   shiftTypes: EXAMPLE_SHIFT_TYPES,
   weekendGroupSchedule: EXAMPLE_WEEKEND_SCHEDULE
 });
+
+const REST_CONSTRAINT_SHIFTS = generateShiftPool({
+  rosterId: "rest-constraint-example-roster",
+  range: {
+    startDate: "2026-04-09",
+    endDate: "2026-04-13"
+  },
+  shiftTypes: EXAMPLE_SHIFT_TYPES,
+  weekendGroupSchedule: EXAMPLE_WEEKEND_SCHEDULE
+});
+
+const REST_CONSTRAINT_SHIFTS_BY_ID = new Map(
+  REST_CONSTRAINT_SHIFTS.map((shift) => [shift.id, shift] as const)
+);
 
 function findExampleShift(date: string, code: string): Shift {
   const shift = CLASSIFICATION_SHIFTS.find(
@@ -90,6 +110,18 @@ function findWeekdayPairExampleShift(date: string, code: string): Shift {
 
   if (!shift) {
     throw new Error(`Weekday pair example shift ${date}/${code} could not be created.`);
+  }
+
+  return shift;
+}
+
+function findRestConstraintExampleShift(date: string, code: string): Shift {
+  const shift = REST_CONSTRAINT_SHIFTS.find(
+    (entry) => entry.date === date && entry.definitionSnapshot.code === code
+  );
+
+  if (!shift) {
+    throw new Error(`Rest example shift ${date}/${code} could not be created.`);
   }
 
   return shift;
@@ -208,6 +240,8 @@ export const leaveExclusionExample = checkShiftEligibility({
   shift: findExampleShift("2026-04-03", "DAY"),
   doctors: EXAMPLE_DOCTORS,
   leaves: LEAVE_EXAMPLE_LEAVES,
+  currentAssignments: [],
+  shiftsById: CLASSIFICATION_SHIFTS_BY_ID,
   weekendGroupSchedule: EXAMPLE_WEEKEND_SCHEDULE
 });
 
@@ -215,8 +249,108 @@ export const weekendGroupExclusionExample = checkShiftEligibility({
   shift: findExampleShift("2026-04-04", "DAY"),
   doctors: EXAMPLE_DOCTORS,
   leaves: [],
+  currentAssignments: [],
+  shiftsById: CLASSIFICATION_SHIFTS_BY_ID,
   weekendGroupSchedule: EXAMPLE_WEEKEND_SCHEDULE
 });
+
+const sameDayDayAssignment: Assignment = {
+  id: "assignment-saturday-day-doctor-b",
+  rosterId: "example-roster",
+  shiftId: findExampleShift("2026-04-04", "DAY").id,
+  assignedDoctorId: "doctor-b",
+  actualDoctorId: "doctor-b",
+  fairnessOwnerDoctorId: "doctor-b",
+  source: "AUTO",
+  createdAt: "2026-04-01T00:00:00.000Z",
+  updatedAt: "2026-04-01T00:00:00.000Z"
+};
+
+export const oneShiftPerDayEligibilityExample = {
+  saturdayNight: checkShiftEligibility({
+    shift: findExampleShift("2026-04-04", "NIGHT"),
+    doctors: EXAMPLE_DOCTORS,
+    leaves: [],
+    currentAssignments: [sameDayDayAssignment],
+    shiftsById: CLASSIFICATION_SHIFTS_BY_ID,
+    weekendGroupSchedule: EXAMPLE_WEEKEND_SCHEDULE
+  }),
+  sundayNight: checkShiftEligibility({
+    shift: findExampleShift("2026-04-05", "NIGHT"),
+    doctors: EXAMPLE_DOCTORS,
+    leaves: [],
+    currentAssignments: [sameDayDayAssignment],
+    shiftsById: CLASSIFICATION_SHIFTS_BY_ID,
+    weekendGroupSchedule: EXAMPLE_WEEKEND_SCHEDULE
+  })
+};
+
+const thursdayNightAssignment: Assignment = {
+  id: "assignment-thursday-night-doctor-b",
+  rosterId: "rest-constraint-example-roster",
+  shiftId: findRestConstraintExampleShift("2026-04-09", "NIGHT").id,
+  assignedDoctorId: "doctor-b",
+  actualDoctorId: "doctor-b",
+  fairnessOwnerDoctorId: "doctor-b",
+  source: "AUTO",
+  createdAt: "2026-04-01T00:00:00.000Z",
+  updatedAt: "2026-04-01T00:00:00.000Z"
+};
+
+const sundayNightAssignment: Assignment = {
+  id: "assignment-sunday-night-doctor-b",
+  rosterId: "rest-constraint-example-roster",
+  shiftId: findRestConstraintExampleShift("2026-04-12", "NIGHT").id,
+  assignedDoctorId: "doctor-b",
+  actualDoctorId: "doctor-b",
+  fairnessOwnerDoctorId: "doctor-b",
+  source: "AUTO",
+  createdAt: "2026-04-01T00:00:00.000Z",
+  updatedAt: "2026-04-01T00:00:00.000Z"
+};
+
+export const restAfterNightEligibilityExample = {
+  fridayDayBlocked: checkShiftEligibility({
+    shift: findRestConstraintExampleShift("2026-04-10", "DAY"),
+    doctors: [EXAMPLE_DOCTORS[1]],
+    leaves: [],
+    currentAssignments: [thursdayNightAssignment],
+    shiftsById: REST_CONSTRAINT_SHIFTS_BY_ID,
+    weekendGroupSchedule: EXAMPLE_WEEKEND_SCHEDULE
+  }),
+  fridayNightBlocked: checkShiftEligibility({
+    shift: findRestConstraintExampleShift("2026-04-10", "NIGHT"),
+    doctors: [EXAMPLE_DOCTORS[1]],
+    leaves: [],
+    currentAssignments: [thursdayNightAssignment],
+    shiftsById: REST_CONSTRAINT_SHIFTS_BY_ID,
+    weekendGroupSchedule: EXAMPLE_WEEKEND_SCHEDULE
+  }),
+  saturdayDayAllowed: checkShiftEligibility({
+    shift: findRestConstraintExampleShift("2026-04-11", "DAY"),
+    doctors: [EXAMPLE_DOCTORS[1]],
+    leaves: [],
+    currentAssignments: [thursdayNightAssignment],
+    shiftsById: REST_CONSTRAINT_SHIFTS_BY_ID,
+    weekendGroupSchedule: EXAMPLE_WEEKEND_SCHEDULE
+  }),
+  mondayDayAfterSundayNightBlocked: checkShiftEligibility({
+    shift: findRestConstraintExampleShift("2026-04-13", "DAY"),
+    doctors: [EXAMPLE_DOCTORS[1]],
+    leaves: [],
+    currentAssignments: [sundayNightAssignment],
+    shiftsById: REST_CONSTRAINT_SHIFTS_BY_ID,
+    weekendGroupSchedule: EXAMPLE_WEEKEND_SCHEDULE
+  }),
+  mondayNightAfterSundayNightBlocked: checkShiftEligibility({
+    shift: findRestConstraintExampleShift("2026-04-13", "NIGHT"),
+    doctors: [EXAMPLE_DOCTORS[1]],
+    leaves: [],
+    currentAssignments: [sundayNightAssignment],
+    shiftsById: REST_CONSTRAINT_SHIFTS_BY_ID,
+    weekendGroupSchedule: EXAMPLE_WEEKEND_SCHEDULE
+  })
+};
 
 const mondayDayShift = findWeekdayPairExampleShift("2026-04-06", "DAY");
 const tuesdayDayShift = findWeekdayPairExampleShift("2026-04-07", "DAY");
@@ -296,6 +430,74 @@ export const deterministicAssignmentExample = generateRoster({
   weekendGroupSchedule: [],
   generatedByActorId: "system",
   config: DEFAULT_SCHEDULING_ENGINE_CONFIG
+});
+
+const mondayDayConflictShift = findWeekdayPairExampleShift("2026-04-06", "DAY");
+const mondayNightConflictShift = findWeekdayPairExampleShift("2026-04-06", "NIGHT");
+
+export const oneShiftPerDayValidationExample = validateGeneratedRoster({
+  doctors: EXAMPLE_DOCTORS,
+  leaves: [],
+  shifts: [mondayDayConflictShift, mondayNightConflictShift],
+  assignments: [
+    {
+      id: "assignment-monday-day",
+      rosterId: "example-roster",
+      shiftId: mondayDayConflictShift.id,
+      assignedDoctorId: "doctor-a",
+      actualDoctorId: "doctor-a",
+      fairnessOwnerDoctorId: "doctor-a",
+      source: "AUTO",
+      createdAt: "2026-04-01T00:00:00.000Z",
+      updatedAt: "2026-04-01T00:00:00.000Z"
+    },
+    {
+      id: "assignment-monday-night",
+      rosterId: "example-roster",
+      shiftId: mondayNightConflictShift.id,
+      assignedDoctorId: "doctor-a",
+      actualDoctorId: "doctor-a",
+      fairnessOwnerDoctorId: "doctor-a",
+      source: "AUTO",
+      createdAt: "2026-04-01T00:00:00.000Z",
+      updatedAt: "2026-04-01T00:00:00.000Z"
+    }
+  ],
+  weekendGroupSchedule: []
+});
+
+const thursdayNightValidationShift = findRestConstraintExampleShift("2026-04-09", "NIGHT");
+const fridayDayValidationShift = findRestConstraintExampleShift("2026-04-10", "DAY");
+
+export const restAfterNightValidationExample = validateGeneratedRoster({
+  doctors: EXAMPLE_DOCTORS,
+  leaves: [],
+  shifts: [thursdayNightValidationShift, fridayDayValidationShift],
+  assignments: [
+    {
+      id: "assignment-thursday-night-validation",
+      rosterId: "rest-validation-roster",
+      shiftId: thursdayNightValidationShift.id,
+      assignedDoctorId: "doctor-b",
+      actualDoctorId: "doctor-b",
+      fairnessOwnerDoctorId: "doctor-b",
+      source: "AUTO",
+      createdAt: "2026-04-01T00:00:00.000Z",
+      updatedAt: "2026-04-01T00:00:00.000Z"
+    },
+    {
+      id: "assignment-friday-day-validation",
+      rosterId: "rest-validation-roster",
+      shiftId: fridayDayValidationShift.id,
+      assignedDoctorId: "doctor-b",
+      actualDoctorId: "doctor-b",
+      fairnessOwnerDoctorId: "doctor-b",
+      source: "AUTO",
+      createdAt: "2026-04-01T00:00:00.000Z",
+      updatedAt: "2026-04-01T00:00:00.000Z"
+    }
+  ],
+  weekendGroupSchedule: EXAMPLE_WEEKEND_SCHEDULE
 });
 
 export const generatedBiasOutputsExample = {

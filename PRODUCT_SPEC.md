@@ -36,6 +36,8 @@ Tracked separately:
 #### HARD CONSTRAINTS (Never violated)
 - No assignment during leave
 - One doctor per shift
+- One shift per day per doctor (no day+night on same date)
+- Rest after night shift (no shift day following a night shift)
 - Weekend-off group cannot work weekend shifts
 - Friday night cannot be assigned to weekend-off group
 - No off-day requests allowed for weekends

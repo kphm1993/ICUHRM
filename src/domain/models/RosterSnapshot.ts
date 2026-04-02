@@ -12,6 +12,14 @@ import type {
 } from "@/domain/models";
 import type { ValidationResult } from "@/domain/scheduling/contracts";
 
+export interface RosterSnapshotDoctorReference {
+  readonly doctorId: EntityId;
+  readonly name: string;
+  readonly uniqueIdentifier: string;
+  readonly weekendGroup: WeekendGroup;
+  readonly isActive: boolean;
+}
+
 export interface GeneratedRosterInputSummary {
   readonly rosterMonth: YearMonthString;
   readonly range: RosterPeriod;
@@ -25,6 +33,7 @@ export interface GeneratedRosterInputSummary {
 
 export interface RosterSnapshot {
   readonly roster: Roster;
+  readonly doctorReferences: ReadonlyArray<RosterSnapshotDoctorReference>;
   readonly shifts: ReadonlyArray<Shift>;
   readonly assignments: ReadonlyArray<Assignment>;
   readonly warnings: ReadonlyArray<string>;

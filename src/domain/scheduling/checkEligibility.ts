@@ -6,6 +6,8 @@ import {
   evaluateFridayNightRule,
   evaluateInactiveDoctorRule,
   evaluateLeaveRule,
+  evaluateOneShiftPerDayRule,
+  evaluateRestAfterNightShiftRule,
   evaluateWeekendGroupRule
 } from "@/domain/scheduling/eligibilityRules";
 
@@ -43,7 +45,27 @@ export function checkShiftEligibility(
       reasons.push(fridayNightReason);
     }
 
-    // TODO: Add one-shift-per-day, consecutive-duty, and operational override rules.
+    const oneShiftPerDayReason = evaluateOneShiftPerDayRule(
+      doctor,
+      input.shift,
+      input.currentAssignments,
+      input.shiftsById
+    );
+    if (oneShiftPerDayReason) {
+      reasons.push(oneShiftPerDayReason);
+    }
+
+    const restAfterNightShiftReason = evaluateRestAfterNightShiftRule(
+      doctor,
+      input.shift,
+      input.currentAssignments,
+      input.shiftsById
+    );
+    if (restAfterNightShiftReason) {
+      reasons.push(restAfterNightShiftReason);
+    }
+
+    // TODO: Add operational override rules.
     return {
       doctorId: doctor.id,
       isEligible: reasons.length === 0,

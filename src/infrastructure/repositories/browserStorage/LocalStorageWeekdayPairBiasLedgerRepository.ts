@@ -59,6 +59,16 @@ export class LocalStorageWeekdayPairBiasLedgerRepository
     return sortWeekdayPairBiasLedgers(entries).map(cloneWeekdayPairBiasLedger);
   }
 
+  async listByDoctor(
+    doctorId: string
+  ): Promise<ReadonlyArray<WeekdayPairBiasLedger>> {
+    const entries = this.readEntries().filter(
+      (entry) => entry.doctorId === doctorId
+    );
+
+    return sortWeekdayPairBiasLedgers(entries).map(cloneWeekdayPairBiasLedger);
+  }
+
   async findByDoctorAndMonth(
     doctorId: string,
     effectiveMonth: string

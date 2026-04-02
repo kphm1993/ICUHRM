@@ -12,5 +12,5 @@ export interface DoctorRepository {
   findByUserId(userId: EntityId): Promise<Doctor | null>;
   findByUniqueIdentifier(uniqueIdentifier: string): Promise<Doctor | null>;
   save(doctor: Doctor): Promise<Doctor>;
+  delete(id: EntityId): Promise<void>;
 }
-

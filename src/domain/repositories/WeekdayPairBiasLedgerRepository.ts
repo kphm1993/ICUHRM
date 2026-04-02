@@ -8,6 +8,9 @@ export interface WeekdayPairBiasLedgerRepository {
   listByMonth(
     effectiveMonth: YearMonthString
   ): Promise<ReadonlyArray<WeekdayPairBiasLedger>>;
+  listByDoctor(
+    doctorId: EntityId
+  ): Promise<ReadonlyArray<WeekdayPairBiasLedger>>;
   findByDoctorAndMonth(
     doctorId: EntityId,
     effectiveMonth: YearMonthString
@@ -17,4 +20,3 @@ export interface WeekdayPairBiasLedgerRepository {
     entries: ReadonlyArray<WeekdayPairBiasLedger>
   ): Promise<ReadonlyArray<WeekdayPairBiasLedger>>;
 }
-

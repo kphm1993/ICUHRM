@@ -7,6 +7,12 @@ import {
   RepositoryConflictError,
   RepositoryNotFoundError
 } from "@/domain/repositories";
+import type { BrowserStorageRepositoryOptions } from "@/infrastructure/repositories/browserStorage/storage";
+import {
+  readCollectionFromStorage,
+  STORAGE_KEYS,
+  writeCollectionToStorage
+} from "@/infrastructure/repositories/browserStorage/storage";
 
 function cloneDoctor(doctor: Doctor): Doctor {
   return { ...doctor };
@@ -19,18 +25,17 @@ function sortDoctors(doctors: ReadonlyArray<Doctor>): ReadonlyArray<Doctor> {
   });
 }
 
-export class InMemoryDoctorRepository implements DoctorRepository {
-  private readonly doctorsById = new Map<string, Doctor>();
+export class LocalStorageDoctorRepository implements DoctorRepository {
+  private readonly storageKey: string;
+  private readonly seedData: ReadonlyArray<Doctor>;
 
-  constructor(seedData: ReadonlyArray<Doctor> = []) {
-    for (const doctor of seedData) {
-      this.assertUniqueConstraints(doctor);
-      this.doctorsById.set(doctor.id, cloneDoctor(doctor));
-    }
+  constructor(options: BrowserStorageRepositoryOptions<Doctor> = {}) {
+    this.storageKey = options.storageKey ?? STORAGE_KEYS.doctors;
+    this.seedData = options.seedData ?? [];
   }
 
   async list(filter?: DoctorRepositoryFilter): Promise<ReadonlyArray<Doctor>> {
-    const doctors = Array.from(this.doctorsById.values()).filter((doctor) => {
+    const doctors = this.readEntries().filter((doctor) => {
       if (filter?.isActive !== undefined && doctor.isActive !== filter.isActive) {
         return false;
       }
@@ -53,42 +58,60 @@ export class InMemoryDoctorRepository implements DoctorRepository {
   }
 
   async findById(id: string): Promise<Doctor | null> {
-    const doctor = this.doctorsById.get(id);
+    const doctor = this.readEntries().find((entry) => entry.id === id);
     return doctor ? cloneDoctor(doctor) : null;
   }
 
   async findByUserId(userId: string): Promise<Doctor | null> {
-    const doctor = Array.from(this.doctorsById.values()).find(
-      (entry) => entry.userId === userId
-    );
-
+    const doctor = this.readEntries().find((entry) => entry.userId === userId);
     return doctor ? cloneDoctor(doctor) : null;
   }
 
   async findByUniqueIdentifier(uniqueIdentifier: string): Promise<Doctor | null> {
-    const doctor = Array.from(this.doctorsById.values()).find(
+    const doctor = this.readEntries().find(
       (entry) => entry.uniqueIdentifier === uniqueIdentifier
     );
-
     return doctor ? cloneDoctor(doctor) : null;
   }
 
   async save(doctor: Doctor): Promise<Doctor> {
-    this.assertUniqueConstraints(doctor);
-    this.doctorsById.set(doctor.id, cloneDoctor(doctor));
+    const entries = this.readEntries();
+    this.assertUniqueConstraints(doctor, entries);
+
+    const nextEntries = entries.filter((entry) => entry.id !== doctor.id);
+    nextEntries.push(cloneDoctor(doctor));
+    this.writeEntries(nextEntries);
+
     return cloneDoctor(doctor);
   }
 
   async delete(id: string): Promise<void> {
-    const wasDeleted = this.doctorsById.delete(id);
+    const entries = this.readEntries();
+    const nextEntries = entries.filter((entry) => entry.id !== id);
 
-    if (!wasDeleted) {
+    if (nextEntries.length === entries.length) {
       throw new RepositoryNotFoundError(`Doctor '${id}' was not found.`);
     }
+
+    this.writeEntries(nextEntries);
   }
 
-  private assertUniqueConstraints(candidate: Doctor): void {
-    for (const existingDoctor of this.doctorsById.values()) {
+  private readEntries(): Doctor[] {
+    return readCollectionFromStorage(this.storageKey, this.seedData).map(cloneDoctor);
+  }
+
+  private writeEntries(entries: ReadonlyArray<Doctor>): void {
+    writeCollectionToStorage(
+      this.storageKey,
+      sortDoctors(entries).map(cloneDoctor)
+    );
+  }
+
+  private assertUniqueConstraints(
+    candidate: Doctor,
+    entries: ReadonlyArray<Doctor>
+  ): void {
+    for (const existingDoctor of entries) {
       if (existingDoctor.id === candidate.id) {
         continue;
       }

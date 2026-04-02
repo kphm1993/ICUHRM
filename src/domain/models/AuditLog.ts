@@ -19,7 +19,11 @@ export type AuditActionType =
   | "EXCHANGE_REJECTED"
   | "EXCHANGE_CANCELLED"
   | "DOCTOR_CREATED"
+  | "DOCTOR_UPDATED"
+  | "DOCTOR_ACTIVATED"
+  | "DOCTOR_DEACTIVATED"
   | "DOCTOR_DELETED"
+  | "DOCTOR_DELETE_BLOCKED"
   | "WEEKEND_GROUP_CHANGED"
   | "SHIFT_TYPE_CHANGED"
   | "ADMIN_OVERRIDE";
@@ -50,4 +54,3 @@ export interface AuditLog {
   readonly createdAt: ISODateTimeString;
   readonly correlationId?: string;
 }
-

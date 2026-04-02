@@ -1,5 +1,6 @@
 import type { Assignment, Doctor, EntityId, Shift } from "@/domain/models";
 import type { ValidateRosterInput, ValidationIssue, ValidationResult } from "@/domain/scheduling/contracts";
+import { addDays, parseIsoDate, toIsoDate } from "@/domain/scheduling/dateUtils";
 import {
   evaluateLeaveRule,
   resolveWeekendOffGroupForShift
@@ -45,6 +46,7 @@ export function validateGeneratedRoster(
   const issues: ValidationIssue[] = [];
   const assignmentsPerShift = new Map<string, number>();
   const assignmentsByShift = new Map<string, Assignment[]>();
+  const shiftsById = new Map(input.shifts.map((shift) => [shift.id, shift] as const));
 
   for (const assignment of input.assignments) {
     const currentCount = assignmentsPerShift.get(assignment.shiftId) ?? 0;
@@ -144,6 +146,137 @@ export function validateGeneratedRoster(
           doctorId: doctor.id
         });
       }
+    }
+  }
+
+  const assignmentsByDoctorDate = new Map<
+    string,
+    {
+      readonly doctorId: EntityId;
+      readonly date: string;
+      dayAssignment?: Assignment;
+      nightAssignment?: Assignment;
+      dayShift?: Shift;
+      nightShift?: Shift;
+    }
+  >();
+
+  for (const assignment of input.assignments) {
+    const shift = shiftsById.get(assignment.shiftId);
+
+    if (!shift || (shift.type !== "DAY" && shift.type !== "NIGHT")) {
+      continue;
+    }
+
+    const doctorId = getAssignmentDoctorId(assignment);
+    const key = `${doctorId}:${shift.date}`;
+    const existingEntry = assignmentsByDoctorDate.get(key) ?? {
+      doctorId,
+      date: shift.date
+    };
+
+    if (shift.type === "DAY") {
+      existingEntry.dayAssignment = assignment;
+      existingEntry.dayShift = shift;
+    }
+
+    if (shift.type === "NIGHT") {
+      existingEntry.nightAssignment = assignment;
+      existingEntry.nightShift = shift;
+    }
+
+    assignmentsByDoctorDate.set(key, existingEntry);
+  }
+
+  for (const entry of assignmentsByDoctorDate.values()) {
+    if (
+      !entry.dayAssignment ||
+      !entry.nightAssignment ||
+      !entry.dayShift ||
+      !entry.nightShift
+    ) {
+      continue;
+    }
+
+    issues.push({
+      code: "ASSIGNMENT_SAME_DAY_CONFLICT",
+      message: `Doctor ${entry.doctorId} is assigned to both ${entry.dayShift.id} and ${entry.nightShift.id} on ${entry.date}. Assignments ${entry.dayAssignment.id} and ${entry.nightAssignment.id} violate the one-shift-per-day rule.`,
+      doctorId: entry.doctorId
+    });
+  }
+
+  const dayNightAssignmentsByDoctorDate = new Map<
+    string,
+    {
+      readonly doctorId: EntityId;
+      readonly date: string;
+      readonly entries: ReadonlyArray<{
+        readonly assignment: Assignment;
+        readonly shift: Shift;
+      }>;
+    }
+  >();
+
+  for (const assignment of input.assignments) {
+    const shift = shiftsById.get(assignment.shiftId);
+
+    if (!shift || (shift.type !== "DAY" && shift.type !== "NIGHT")) {
+      continue;
+    }
+
+    const doctorId = getAssignmentDoctorId(assignment);
+    const key = `${doctorId}:${shift.date}`;
+    const currentEntry = dayNightAssignmentsByDoctorDate.get(key);
+    const nextEntries = [
+      ...(currentEntry?.entries ?? []),
+      {
+        assignment,
+        shift
+      }
+    ];
+
+    dayNightAssignmentsByDoctorDate.set(key, {
+      doctorId,
+      date: shift.date,
+      entries: nextEntries
+    });
+  }
+
+  const sortedDoctorDateEntries = [...dayNightAssignmentsByDoctorDate.values()].sort(
+    (left, right) => {
+      const doctorComparison = left.doctorId.localeCompare(right.doctorId);
+      return doctorComparison !== 0
+        ? doctorComparison
+        : left.date.localeCompare(right.date);
+    }
+  );
+
+  for (const entry of sortedDoctorDateEntries) {
+    const hasNightShift = entry.entries.some(
+      (currentEntry) => currentEntry.shift.type === "NIGHT"
+    );
+
+    if (!hasNightShift) {
+      continue;
+    }
+
+    const nextDate = toIsoDate(addDays(parseIsoDate(entry.date), 1));
+    const nextDayEntry = dayNightAssignmentsByDoctorDate.get(
+      `${entry.doctorId}:${nextDate}`
+    );
+
+    if (!nextDayEntry) {
+      continue;
+    }
+
+    for (const violatingEntry of nextDayEntry.entries) {
+      issues.push({
+        code: "ASSIGNMENT_REST_AFTER_NIGHT_VIOLATION",
+        message: `Doctor ${entry.doctorId} is assigned to shift ${violatingEntry.shift.id} on ${nextDate} after working a night shift on ${entry.date}.`,
+        shiftId: violatingEntry.shift.id,
+        assignmentId: violatingEntry.assignment.id,
+        doctorId: entry.doctorId
+      });
     }
   }
 

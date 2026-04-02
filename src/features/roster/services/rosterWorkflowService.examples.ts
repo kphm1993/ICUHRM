@@ -15,9 +15,11 @@ import {
   ROSTER_SEED_WEEKDAY_PAIR_BIAS_LEDGERS
 } from "@/app/seed/rosterSeedData";
 import {
+  InMemoryBiasLedgerRepository,
   InMemoryDoctorRepository,
   InMemoryLeaveRepository,
-  InMemoryShiftTypeRepository
+  InMemoryShiftTypeRepository,
+  InMemoryWeekdayPairBiasLedgerRepository
 } from "@/infrastructure/repositories/inMemory";
 import {
   LocalStorageAuditLogRepository,
@@ -48,10 +50,21 @@ function createExampleWorkflow(storageKeyPrefix: string) {
     storageKey: `${storageKeyPrefix}:off-requests`,
     seedData: ROSTER_SEED_OFF_REQUESTS
   });
+  const auditLogService = createAuditLogService({
+    auditLogRepository
+  });
 
   const workflowService = createRosterWorkflowService({
     doctorManagementService: createDoctorManagementService({
-      doctorRepository: new InMemoryDoctorRepository(ROSTER_SEED_DOCTORS)
+      doctorRepository: new InMemoryDoctorRepository(ROSTER_SEED_DOCTORS),
+      leaveRepository: new InMemoryLeaveRepository(ROSTER_SEED_LEAVES),
+      offRequestRepository,
+      biasLedgerRepository: new InMemoryBiasLedgerRepository(ROSTER_SEED_BIAS_LEDGERS),
+      weekdayPairBiasLedgerRepository: new InMemoryWeekdayPairBiasLedgerRepository(
+        ROSTER_SEED_WEEKDAY_PAIR_BIAS_LEDGERS
+      ),
+      rosterSnapshotRepository,
+      auditLogService
     }),
     leaveManagementService: createLeaveManagementService({
       leaveRepository: new InMemoryLeaveRepository(ROSTER_SEED_LEAVES)
@@ -70,9 +83,7 @@ function createExampleWorkflow(storageKeyPrefix: string) {
     biasLedgerRepository,
     weekdayPairBiasLedgerRepository,
     rosterSnapshotRepository,
-    auditLogService: createAuditLogService({
-      auditLogRepository
-    })
+    auditLogService
   });
 
   return {
