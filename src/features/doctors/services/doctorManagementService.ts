@@ -3,7 +3,8 @@ import type {
   EntityId,
   WeekendGroup
 } from "@/domain/models";
-import { notImplemented } from "@/shared/lib/notImplemented";
+import type { DoctorRepository } from "@/domain/repositories";
+import { RepositoryNotFoundError } from "@/domain/repositories";
 
 export interface CreateDoctorInput {
   readonly userId: EntityId;
@@ -21,20 +22,64 @@ export interface DoctorManagementService {
   deactivateDoctor(doctorId: EntityId): Promise<void>;
 }
 
-export function createDoctorManagementServicePlaceholder(): DoctorManagementService {
+export interface DoctorManagementServiceDependencies {
+  readonly doctorRepository: DoctorRepository;
+}
+
+export function createDoctorManagementService(
+  dependencies: DoctorManagementServiceDependencies
+): DoctorManagementService {
   return {
     async listDoctors() {
-      throw notImplemented("DoctorManagementService.listDoctors");
+      return dependencies.doctorRepository.list();
     },
-    async createDoctor() {
-      throw notImplemented("DoctorManagementService.createDoctor");
+    async createDoctor(input) {
+      const timestamp = new Date().toISOString();
+
+      const doctor: Doctor = {
+        id: crypto.randomUUID(),
+        userId: input.userId,
+        name: input.name,
+        phoneNumber: input.phoneNumber,
+        uniqueIdentifier: input.uniqueIdentifier,
+        weekendGroup: input.weekendGroup,
+        isActive: true,
+        createdAt: timestamp,
+        updatedAt: timestamp
+      };
+
+      // TODO: Provision the user credential using temporaryPassword when auth wiring is added.
+      return dependencies.doctorRepository.save(doctor);
     },
-    async updateWeekendGroup() {
-      throw notImplemented("DoctorManagementService.updateWeekendGroup");
+    async updateWeekendGroup(doctorId, weekendGroup) {
+      const doctor = await dependencies.doctorRepository.findById(doctorId);
+
+      if (!doctor) {
+        throw new RepositoryNotFoundError(`Doctor '${doctorId}' was not found.`);
+      }
+
+      return dependencies.doctorRepository.save({
+        ...doctor,
+        weekendGroup,
+        updatedAt: new Date().toISOString()
+      });
     },
-    async deactivateDoctor() {
-      throw notImplemented("DoctorManagementService.deactivateDoctor");
+    async deactivateDoctor(doctorId) {
+      const doctor = await dependencies.doctorRepository.findById(doctorId);
+
+      if (!doctor) {
+        throw new RepositoryNotFoundError(`Doctor '${doctorId}' was not found.`);
+      }
+
+      if (!doctor.isActive) {
+        return;
+      }
+
+      await dependencies.doctorRepository.save({
+        ...doctor,
+        isActive: false,
+        updatedAt: new Date().toISOString()
+      });
     }
   };
 }
-
