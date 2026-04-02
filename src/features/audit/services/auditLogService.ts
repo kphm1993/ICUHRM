@@ -1,6 +1,6 @@
 import type { AuditLog } from "@/domain/models";
 import type { AppendAuditLogInput } from "@/domain/audit";
-import { notImplemented } from "@/shared/lib/notImplemented";
+import type { AuditLogRepository } from "@/domain/repositories";
 
 export interface AuditLogFilter {
   readonly entityType?: AuditLog["entityType"];
@@ -14,13 +14,29 @@ export interface AuditLogService {
   listLogs(filter?: AuditLogFilter): Promise<ReadonlyArray<AuditLog>>;
 }
 
-export function createAuditLogServicePlaceholder(): AuditLogService {
+export interface AuditLogServiceDependencies {
+  readonly auditLogRepository: AuditLogRepository;
+}
+
+export function createAuditLogService(
+  dependencies: AuditLogServiceDependencies
+): AuditLogService {
   return {
-    async appendLog() {
-      throw notImplemented("AuditLogService.appendLog");
+    async appendLog(entry) {
+      return dependencies.auditLogRepository.append({
+        id: crypto.randomUUID(),
+        actorId: entry.actorId,
+        actorRole: entry.actorRole,
+        actionType: entry.actionType,
+        entityType: entry.entityType,
+        entityId: entry.entityId,
+        details: entry.details,
+        createdAt: new Date().toISOString(),
+        correlationId: entry.correlationId
+      });
     },
-    async listLogs() {
-      throw notImplemented("AuditLogService.listLogs");
+    async listLogs(filter) {
+      return dependencies.auditLogRepository.list(filter);
     }
   };
 }

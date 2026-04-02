@@ -38,15 +38,15 @@ export function AppShell() {
               </p>
               <div className="mt-2 flex flex-wrap items-center gap-3">
                 <h1 className="text-xl font-semibold tracking-tight text-slate-900">
-                  V1 Foundation Shell
+                  V1 Roster Workflow
                 </h1>
                 <span className="rounded-full bg-brand-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-brand-800">
                   {getRoleLabel(role)}
                 </span>
               </div>
               <p className="mt-2 text-sm text-slate-600">
-                Signed in as {user.displayName}. Navigation is already role-aware, while
-                domain logic stays outside the UI layer.
+                Signed in as {user.displayName}. The app now keeps admin workflow rules,
+                scheduling logic, and persisted roster snapshots outside the UI layer.
               </p>
             </div>
 
@@ -86,4 +86,3 @@ export function AppShell() {
     </div>
   );
 }
-

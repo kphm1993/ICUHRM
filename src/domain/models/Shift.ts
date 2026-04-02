@@ -22,6 +22,8 @@ export interface Shift {
   readonly rosterId: EntityId;
   readonly date: ISODateString;
   readonly shiftTypeId: EntityId;
+  readonly startTime: TimeOfDayString;
+  readonly endTime: TimeOfDayString;
   readonly type: ShiftKind;
   readonly category: ShiftCategory;
   readonly special: ShiftSpecialFlag;
@@ -29,4 +31,3 @@ export interface Shift {
   readonly definitionSnapshot: ShiftDefinitionSnapshot;
   readonly createdAt: ISODateTimeString;
 }
-

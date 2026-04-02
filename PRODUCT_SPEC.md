@@ -124,6 +124,36 @@ BiasLedger {
   weekend_night
 }
 
+WeekdayPairBiasLedger {
+  doctor_id
+  monday_day
+  monday_night
+  tuesday_day
+  tuesday_night
+  wednesday_day
+  wednesday_night
+  thursday_day
+  thursday_night
+  friday_day
+  friday_night
+}
+
+Weekday pair bias is tracked separately from total weekday day/night bias.
+
+Primary fairness priority:
+- equalize total weekday day counts
+- equalize total weekday night counts
+- equalize total weekend day counts
+- equalize total weekend night counts
+
+Secondary fairness priority:
+- equalize weekday duty-and-day pairs
+  (e.g. Tuesday night, Monday day, Friday night)
+
+The scheduling engine must always prioritize correcting total bucket bias before correcting weekday pair bias.
+
+Pair bias should influence candidate scoring only after primary total fairness is preserved as much as possible.
+
 ---
 
 ### 5.2 Bias Behavior

@@ -3,4 +3,7 @@ export * from "@/domain/repositories/DoctorRepository";
 export * from "@/domain/repositories/ShiftTypeRepository";
 export * from "@/domain/repositories/LeaveRepository";
 export * from "@/domain/repositories/BiasLedgerRepository";
-
+export * from "@/domain/repositories/WeekdayPairBiasLedgerRepository";
+export * from "@/domain/repositories/RosterSnapshotRepository";
+export * from "@/domain/repositories/OffRequestRepository";
+export * from "@/domain/repositories/AuditLogRepository";

@@ -9,5 +9,6 @@ export * from "@/domain/models/Leave";
 export * from "@/domain/models/OffRequest";
 export * from "@/domain/models/ExchangeRequest";
 export * from "@/domain/models/BiasLedger";
+export * from "@/domain/models/WeekdayPairBiasLedger";
 export * from "@/domain/models/AuditLog";
-
+export * from "@/domain/models/RosterSnapshot";

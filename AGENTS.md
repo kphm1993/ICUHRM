@@ -59,6 +59,8 @@ Instead:
 
 ## Plan Mode Behaviour
 
+When user toggled the plan mode this instruction should be used
+
 Before coding, act as a senior frontend architect.
 
 For this change, decide the cleanest implementation approach for a professional, scalable, maintainable app.
