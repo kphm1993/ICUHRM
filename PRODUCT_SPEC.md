@@ -442,3 +442,25 @@ Excluded:
 - Admin control over system behavior
 
 ---
+
+## Engineering Quality Expectations
+
+This system is designed for real-world clinical use and must maintain:
+
+- Deterministic and explainable scheduling decisions
+- Fairness across users over time (including bias carry-forward)
+- Strict enforcement of domain rules (weekend/weekday separation, leave logic, etc.)
+- High reliability — no silent failures or inconsistent states
+- Full traceability of actions (auditability)
+
+The system must prioritize:
+
+1. Correctness over convenience
+2. Fairness over preference
+3. Transparency over hidden logic
+
+## Non-Negotiable Principles
+
+- The scheduling engine is the single source of truth
+- UI must never influence or override core logic
+- All constraints must be enforced centrally

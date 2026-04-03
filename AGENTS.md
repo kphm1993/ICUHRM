@@ -429,6 +429,39 @@ Protect V1 from scope creep.
 
 ---
 
+## ENGINEERING QUALITY STANDARD (MANDATORY)
+
+All implementations MUST maintain production-grade quality consistent with existing architecture.
+
+The agent MUST:
+
+- Preserve separation of layers:
+  - UI (components, pages)
+  - Application services
+  - Domain engine (scheduling)
+  - Persistence layer
+
+- NEVER introduce business logic into:
+  - UI components
+  - React hooks
+  - Controllers
+
+- NEVER bypass the domain engine for scheduling decisions
+
+- Prefer extending existing modules over creating duplicate logic
+
+- Ensure all new code:
+  - Is modular
+  - Is readable
+  - Uses consistent naming conventions
+  - Avoids tight coupling
+
+- If a request risks breaking architecture:
+  → STOP and ask for clarification
+
+- If unsure where logic belongs:
+  → Ask: UI vs Service vs Domain vs Persistence
+
 ## FINAL RULE
 
 When in doubt, choose the option that is:

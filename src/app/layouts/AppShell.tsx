@@ -11,7 +11,7 @@ const navigationItems: ReadonlyArray<{
   { to: "/doctor-dashboard", label: "Doctor Dashboard", roles: ["ADMIN", "DOCTOR"] },
   { to: "/fairness", label: "Fairness", roles: ["ADMIN", "DOCTOR"] },
   { to: "/requests", label: "Requests", roles: ["ADMIN", "DOCTOR"] },
-  { to: "/admin", label: "Admin Settings", roles: ["ADMIN"] }
+  { to: "/admin", label: "Admin Tools", roles: ["ADMIN"] }
 ];
 
 function getRoleLabel(role: UserRole) {
