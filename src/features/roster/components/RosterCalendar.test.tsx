@@ -1,7 +1,11 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
-import type { Doctor, RosterSnapshot } from "@/domain/models";
+import {
+  DEFAULT_DUTY_LOCATION_ID,
+  type Doctor,
+  type RosterSnapshot
+} from "@/domain/models";
 import { RosterCalendar } from "@/features/roster/components/RosterCalendar";
 
 const TEST_DOCTORS: ReadonlyArray<Doctor> = [
@@ -37,6 +41,7 @@ const TEST_SNAPSHOT: RosterSnapshot = {
       endDate: "2026-04-30"
     },
     status: "LOCKED",
+    isDeleted: false,
     createdAt: "2026-04-01T00:00:00.000Z",
     createdByUserId: "user-admin-demo",
     generatedAt: "2026-04-01T00:00:00.000Z",
@@ -66,6 +71,7 @@ const TEST_SNAPSHOT: RosterSnapshot = {
       rosterId: "roster-test",
       date: "2026-04-10",
       shiftTypeId: "shift-type-day",
+      locationId: DEFAULT_DUTY_LOCATION_ID,
       startTime: "08:00",
       endTime: "20:00",
       type: "DAY",
@@ -74,6 +80,7 @@ const TEST_SNAPSHOT: RosterSnapshot = {
       groupEligibility: "ALL",
       definitionSnapshot: {
         shiftTypeId: "shift-type-day",
+        locationId: DEFAULT_DUTY_LOCATION_ID,
         code: "DAY",
         label: "Day",
         startTime: "08:00",
@@ -86,6 +93,7 @@ const TEST_SNAPSHOT: RosterSnapshot = {
       rosterId: "roster-test",
       date: "2026-04-10",
       shiftTypeId: "shift-type-night",
+      locationId: DEFAULT_DUTY_LOCATION_ID,
       startTime: "20:00",
       endTime: "08:00",
       type: "NIGHT",
@@ -94,6 +102,7 @@ const TEST_SNAPSHOT: RosterSnapshot = {
       groupEligibility: "ALL",
       definitionSnapshot: {
         shiftTypeId: "shift-type-night",
+        locationId: DEFAULT_DUTY_LOCATION_ID,
         code: "NIGHT",
         label: "Night",
         startTime: "20:00",
@@ -106,6 +115,7 @@ const TEST_SNAPSHOT: RosterSnapshot = {
       rosterId: "roster-test",
       date: "2026-04-11",
       shiftTypeId: "shift-type-day",
+      locationId: DEFAULT_DUTY_LOCATION_ID,
       startTime: "08:00",
       endTime: "20:00",
       type: "DAY",
@@ -114,6 +124,7 @@ const TEST_SNAPSHOT: RosterSnapshot = {
       groupEligibility: "NOT_WEEKEND_OFF_GROUP",
       definitionSnapshot: {
         shiftTypeId: "shift-type-day",
+        locationId: DEFAULT_DUTY_LOCATION_ID,
         code: "DAY",
         label: "Day",
         startTime: "08:00",
@@ -164,7 +175,9 @@ const TEST_SNAPSHOT: RosterSnapshot = {
     offRequestCount: 0,
     shiftTypeCount: 2,
     firstWeekendOffGroup: "A",
-    weekendGroupSchedule: []
+    weekendGroupSchedule: [],
+    activeBiasCriteria: [],
+    activeDutyLocations: []
   }
 };
 

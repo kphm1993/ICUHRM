@@ -1,4 +1,4 @@
-import type { BiasBalance, BiasLedger } from "@/domain/models";
+import type { BiasLedger, BiasLedgerBalances } from "@/domain/models";
 import type { BiasLedgerRepository } from "@/domain/repositories";
 import { RepositoryConflictError } from "@/domain/repositories";
 import type { BrowserStorageRepositoryOptions } from "@/infrastructure/repositories/browserStorage/storage";
@@ -8,15 +8,19 @@ import {
   writeCollectionToStorage
 } from "@/infrastructure/repositories/browserStorage/storage";
 
-function cloneBiasBalance(balance: BiasBalance): BiasBalance {
-  return { ...balance };
+function cloneBiasBalances(balances: BiasLedgerBalances): BiasLedgerBalances {
+  return { ...balances };
+}
+
+function normalizeBiasLedger(entry: BiasLedger & { balance?: BiasLedgerBalances }): BiasLedger {
+  return {
+    ...entry,
+    balances: cloneBiasBalances(entry.balances ?? entry.balance ?? {})
+  };
 }
 
 function cloneBiasLedger(entry: BiasLedger): BiasLedger {
-  return {
-    ...entry,
-    balance: cloneBiasBalance(entry.balance)
-  };
+  return normalizeBiasLedger(entry);
 }
 
 function sortBiasLedgers(entries: ReadonlyArray<BiasLedger>): ReadonlyArray<BiasLedger> {
@@ -51,6 +55,12 @@ export class LocalStorageBiasLedgerRepository implements BiasLedgerRepository {
     );
 
     return sortBiasLedgers(entries).map(cloneBiasLedger);
+  }
+
+  async hasAnyBalanceForCriteria(criteriaId: string): Promise<boolean> {
+    return this.readEntries().some((entry) =>
+      Object.prototype.hasOwnProperty.call(entry.balances, criteriaId)
+    );
   }
 
   async findByDoctorAndMonth(
@@ -97,7 +107,9 @@ export class LocalStorageBiasLedgerRepository implements BiasLedgerRepository {
   }
 
   private readEntries(): BiasLedger[] {
-    return readCollectionFromStorage(this.storageKey, this.seedData).map(cloneBiasLedger);
+    return readCollectionFromStorage(this.storageKey, this.seedData).map((entry) =>
+      normalizeBiasLedger(entry as BiasLedger & { balance?: BiasLedgerBalances })
+    );
   }
 
   private writeEntries(entries: ReadonlyArray<BiasLedger>): void {

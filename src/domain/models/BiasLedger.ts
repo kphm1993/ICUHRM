@@ -4,12 +4,21 @@ import type {
   YearMonthString
 } from "@/domain/models/primitives";
 
-export interface BiasBalance {
-  readonly weekdayDay: number;
-  readonly weekdayNight: number;
-  readonly weekendDay: number;
-  readonly weekendNight: number;
-}
+export type LegacyPrimaryBiasCriterionId =
+  | "weekdayDay"
+  | "weekdayNight"
+  | "weekendDay"
+  | "weekendNight";
+
+export const LEGACY_PRIMARY_BIAS_CRITERION_IDS = [
+  "weekdayDay",
+  "weekdayNight",
+  "weekendDay",
+  "weekendNight"
+] as const satisfies ReadonlyArray<LegacyPrimaryBiasCriterionId>;
+
+export type BiasBalance = Readonly<Record<LegacyPrimaryBiasCriterionId, number>>;
+export type BiasLedgerBalances = Readonly<Record<EntityId, number>>;
 
 export type BiasLedgerSource =
   | "ROSTER_GENERATION"
@@ -20,10 +29,9 @@ export interface BiasLedger {
   readonly id: EntityId;
   readonly doctorId: EntityId;
   readonly effectiveMonth: YearMonthString;
-  readonly balance: BiasBalance;
+  readonly balances: BiasLedgerBalances;
   readonly source: BiasLedgerSource;
   readonly sourceReferenceId?: EntityId;
   readonly updatedAt: ISODateTimeString;
   readonly updatedByActorId: EntityId;
 }
-

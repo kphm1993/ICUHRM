@@ -1,7 +1,9 @@
 import type {
   AuditLog,
+  BiasCriteria,
   BiasLedger,
   Doctor,
+  DutyLocation,
   Leave,
   OffRequest,
   RosterSnapshot,
@@ -9,6 +11,7 @@ import type {
   WeekdayPairBiasLedger,
   YearMonthString
 } from "@/domain/models";
+import { DEFAULT_DUTY_LOCATION_ID } from "@/domain/models";
 
 const CURRENT_ROSTER_MONTH = "2026-04" as YearMonthString;
 const NOW = "2026-04-01T08:00:00.000Z";
@@ -96,6 +99,20 @@ export const ROSTER_SEED_SHIFT_TYPES: ReadonlyArray<ShiftType> = [
   }
 ];
 
+export const ROSTER_SEED_DUTY_LOCATIONS: ReadonlyArray<DutyLocation> = [
+  {
+    id: DEFAULT_DUTY_LOCATION_ID,
+    code: "CCU",
+    label: "Cardiac Care Unit",
+    description: "Default V1 duty location for generated ICU roster shifts.",
+    isActive: true,
+    createdAt: NOW,
+    updatedAt: NOW
+  }
+];
+
+export const ROSTER_SEED_BIAS_CRITERIA: ReadonlyArray<BiasCriteria> = [];
+
 export const ROSTER_SEED_LEAVES: ReadonlyArray<Leave> = [
   {
     id: "leave-kumara-april",
@@ -160,7 +177,7 @@ export const ROSTER_SEED_BIAS_LEDGERS: ReadonlyArray<BiasLedger> = [
     id: "bias-demo-april",
     doctorId: "doctor-demo",
     effectiveMonth: CURRENT_ROSTER_MONTH,
-    balance: {
+    balances: {
       weekdayDay: -1,
       weekdayNight: 0,
       weekendDay: 0,
@@ -175,7 +192,7 @@ export const ROSTER_SEED_BIAS_LEDGERS: ReadonlyArray<BiasLedger> = [
     id: "bias-kumara-april",
     doctorId: "doctor-kumara",
     effectiveMonth: CURRENT_ROSTER_MONTH,
-    balance: {
+    balances: {
       weekdayDay: 1,
       weekdayNight: -1,
       weekendDay: 0,
@@ -190,7 +207,7 @@ export const ROSTER_SEED_BIAS_LEDGERS: ReadonlyArray<BiasLedger> = [
     id: "bias-fonseka-april",
     doctorId: "doctor-fonseka",
     effectiveMonth: CURRENT_ROSTER_MONTH,
-    balance: {
+    balances: {
       weekdayDay: 0,
       weekdayNight: 1,
       weekendDay: -1,
@@ -205,7 +222,7 @@ export const ROSTER_SEED_BIAS_LEDGERS: ReadonlyArray<BiasLedger> = [
     id: "bias-jayasena-april",
     doctorId: "doctor-jayasena",
     effectiveMonth: CURRENT_ROSTER_MONTH,
-    balance: {
+    balances: {
       weekdayDay: 0,
       weekdayNight: 0,
       weekendDay: 1,

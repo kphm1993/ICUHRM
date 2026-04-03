@@ -20,6 +20,9 @@ export interface Roster {
   readonly id: EntityId;
   readonly period: RosterPeriod;
   readonly status: RosterStatus;
+  readonly isDeleted: boolean;
+  readonly deletedAt?: ISODateTimeString;
+  readonly deletedByActorId?: EntityId;
   readonly createdAt: ISODateTimeString;
   readonly createdByUserId: EntityId;
   readonly generatedAt?: ISODateTimeString;
@@ -28,4 +31,3 @@ export interface Roster {
   readonly weekendGroupSchedule: ReadonlyArray<WeekendGroupScheduleEntry>;
   readonly notes?: string;
 }
-

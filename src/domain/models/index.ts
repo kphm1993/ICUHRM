@@ -2,6 +2,8 @@ export * from "@/domain/models/primitives";
 export * from "@/domain/models/User";
 export * from "@/domain/models/Doctor";
 export * from "@/domain/models/ShiftType";
+export * from "@/domain/models/DutyLocation";
+export * from "@/domain/models/BiasCriteria";
 export * from "@/domain/models/Shift";
 export * from "@/domain/models/Roster";
 export * from "@/domain/models/Assignment";

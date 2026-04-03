@@ -1,17 +1,19 @@
-import type {
-  Assignment,
-  BiasLedger,
-  Doctor,
-  Leave,
-  OffRequest,
-  Shift,
-  ShiftType,
-  WeekdayPairBiasLedger,
-  WeekendGroupScheduleEntry
+import {
+  DEFAULT_DUTY_LOCATION_ID,
+  type Assignment,
+  type BiasCriteria,
+  type BiasLedger,
+  type Doctor,
+  type DutyLocation,
+  type Leave,
+  type OffRequest,
+  type Shift,
+  type ShiftType,
+  type WeekendGroupScheduleEntry
 } from "@/domain/models";
 import { checkShiftEligibility } from "@/domain/scheduling/checkEligibility";
-import { resolveShiftWeekdayPairBiasBucket } from "@/domain/scheduling/biasBuckets";
 import { DEFAULT_SCHEDULING_ENGINE_CONFIG } from "@/domain/scheduling/config";
+import { determineBiasCriteriaForShift } from "@/domain/scheduling/determineBiasCriteria";
 import {
   initializeFairnessWorkingState,
   recordAssignmentForShift
@@ -46,6 +48,63 @@ const EXAMPLE_SHIFT_TYPES: ReadonlyArray<ShiftType> = [
   }
 ];
 
+const EXAMPLE_DUTY_LOCATIONS: ReadonlyArray<DutyLocation> = [
+  {
+    id: DEFAULT_DUTY_LOCATION_ID,
+    code: "CCU",
+    label: "Cardiac Care Unit",
+    description: "Example default duty location",
+    isActive: true,
+    createdAt: "2026-04-01T00:00:00.000Z",
+    updatedAt: "2026-04-01T00:00:00.000Z"
+  }
+];
+
+const EXAMPLE_BIAS_CRITERIA: ReadonlyArray<BiasCriteria> = [
+  {
+    id: "criteria-day-all",
+    code: "DAY_ALL",
+    label: "All Day Shifts",
+    locationIds: [DEFAULT_DUTY_LOCATION_ID],
+    shiftTypeIds: ["shift-type-day"],
+    weekdayConditions: [],
+    isWeekendOnly: false,
+    isActive: true,
+    createdAt: "2026-04-01T00:00:00.000Z",
+    updatedAt: "2026-04-01T00:00:00.000Z",
+    createdByActorId: "user-admin-demo",
+    updatedByActorId: "user-admin-demo"
+  },
+  {
+    id: "criteria-night-all",
+    code: "NIGHT_ALL",
+    label: "All Night Shifts",
+    locationIds: [DEFAULT_DUTY_LOCATION_ID],
+    shiftTypeIds: ["shift-type-night"],
+    weekdayConditions: [],
+    isWeekendOnly: false,
+    isActive: true,
+    createdAt: "2026-04-01T00:00:00.000Z",
+    updatedAt: "2026-04-01T00:00:00.000Z",
+    createdByActorId: "user-admin-demo",
+    updatedByActorId: "user-admin-demo"
+  },
+  {
+    id: "criteria-weekend",
+    code: "WEEKEND",
+    label: "Weekend Coverage",
+    locationIds: [],
+    shiftTypeIds: [],
+    weekdayConditions: ["SAT", "SUN"],
+    isWeekendOnly: true,
+    isActive: true,
+    createdAt: "2026-04-01T00:00:00.000Z",
+    updatedAt: "2026-04-01T00:00:00.000Z",
+    createdByActorId: "user-admin-demo",
+    updatedByActorId: "user-admin-demo"
+  }
+];
+
 const EXAMPLE_WEEKEND_SCHEDULE: ReadonlyArray<WeekendGroupScheduleEntry> = [
   {
     weekendStartDate: "2026-04-04",
@@ -60,6 +119,7 @@ const CLASSIFICATION_SHIFTS = generateShiftPool({
     endDate: "2026-04-05"
   },
   shiftTypes: EXAMPLE_SHIFT_TYPES,
+  generationLocationId: DEFAULT_DUTY_LOCATION_ID,
   weekendGroupSchedule: EXAMPLE_WEEKEND_SCHEDULE
 });
 
@@ -74,6 +134,7 @@ const WEEKDAY_PAIR_CLASSIFICATION_SHIFTS = generateShiftPool({
     endDate: "2026-04-10"
   },
   shiftTypes: EXAMPLE_SHIFT_TYPES,
+  generationLocationId: DEFAULT_DUTY_LOCATION_ID,
   weekendGroupSchedule: EXAMPLE_WEEKEND_SCHEDULE
 });
 
@@ -84,6 +145,7 @@ const REST_CONSTRAINT_SHIFTS = generateShiftPool({
     endDate: "2026-04-13"
   },
   shiftTypes: EXAMPLE_SHIFT_TYPES,
+  generationLocationId: DEFAULT_DUTY_LOCATION_ID,
   weekendGroupSchedule: EXAMPLE_WEEKEND_SCHEDULE
 });
 
@@ -156,40 +218,15 @@ const EXAMPLE_BIAS_LEDGER: ReadonlyArray<BiasLedger> = EXAMPLE_DOCTORS.map((doct
   id: `bias-${doctor.id}`,
   doctorId: doctor.id,
   effectiveMonth: "2026-03",
-  balance: {
-    weekdayDay: 0,
-    weekdayNight: 0,
-    weekendDay: 0,
-    weekendNight: 0
+  balances: {
+    "criteria-day-all": doctor.id === "doctor-a" ? 1 : 0,
+    "criteria-night-all": doctor.id === "doctor-a" ? -1 : 0
   },
   source: "ROSTER_GENERATION",
   sourceReferenceId: "roster-previous",
   updatedAt: "2026-03-31T23:59:00.000Z",
   updatedByActorId: "system"
 }));
-
-const EXAMPLE_WEEKDAY_PAIR_BIAS_LEDGER: ReadonlyArray<WeekdayPairBiasLedger> =
-  EXAMPLE_DOCTORS.map((doctor) => ({
-    id: `pair-bias-${doctor.id}`,
-    doctorId: doctor.id,
-    effectiveMonth: "2026-03",
-    balance: {
-      mondayDay: 0,
-      mondayNight: 0,
-      tuesdayDay: 0,
-      tuesdayNight: 0,
-      wednesdayDay: 0,
-      wednesdayNight: 0,
-      thursdayDay: 0,
-      thursdayNight: 0,
-      fridayDay: 0,
-      fridayNight: 0
-    },
-    source: "ROSTER_GENERATION",
-    sourceReferenceId: "roster-previous",
-    updatedAt: "2026-03-31T23:59:00.000Z",
-    updatedByActorId: "system"
-  }));
 
 const LEAVE_EXAMPLE_LEAVES: ReadonlyArray<Leave> = [
   {
@@ -224,16 +261,25 @@ export const schedulingClassificationExamples = {
   }
 };
 
-export const weekdayPairMappingExamples = {
-  mondayDay: resolveShiftWeekdayPairBiasBucket(
-    findWeekdayPairExampleShift("2026-04-06", "DAY")
-  ),
-  fridayNight: resolveShiftWeekdayPairBiasBucket(
-    findWeekdayPairExampleShift("2026-04-10", "NIGHT")
-  ),
-  saturdayDay: resolveShiftWeekdayPairBiasBucket(
-    findExampleShift("2026-04-04", "DAY")
-  )
+export const biasCriteriaMatchingExamples = {
+  mondayDay: determineBiasCriteriaForShift({
+    shift: findWeekdayPairExampleShift("2026-04-06", "DAY"),
+    shiftType: EXAMPLE_SHIFT_TYPES[0],
+    location: EXAMPLE_DUTY_LOCATIONS[0],
+    activeCriteria: EXAMPLE_BIAS_CRITERIA
+  }).map((criteria) => criteria.code),
+  fridayNight: determineBiasCriteriaForShift({
+    shift: findWeekdayPairExampleShift("2026-04-10", "NIGHT"),
+    shiftType: EXAMPLE_SHIFT_TYPES[1],
+    location: EXAMPLE_DUTY_LOCATIONS[0],
+    activeCriteria: EXAMPLE_BIAS_CRITERIA
+  }).map((criteria) => criteria.code),
+  saturdayDay: determineBiasCriteriaForShift({
+    shift: findExampleShift("2026-04-04", "DAY"),
+    shiftType: EXAMPLE_SHIFT_TYPES[0],
+    location: EXAMPLE_DUTY_LOCATIONS[0],
+    activeCriteria: EXAMPLE_BIAS_CRITERIA
+  }).map((criteria) => criteria.code)
 };
 
 export const leaveExclusionExample = checkShiftEligibility({
@@ -353,19 +399,18 @@ export const restAfterNightEligibilityExample = {
 };
 
 const mondayDayShift = findWeekdayPairExampleShift("2026-04-06", "DAY");
-const tuesdayDayShift = findWeekdayPairExampleShift("2026-04-07", "DAY");
+const mondayNightShift = findWeekdayPairExampleShift("2026-04-06", "NIGHT");
 
-const weekdayPairLoadFairnessState = recordAssignmentForShift(
-  recordAssignmentForShift(
-    initializeFairnessWorkingState(EXAMPLE_DOCTORS),
-    mondayDayShift,
-    "doctor-a"
-  ),
-  tuesdayDayShift,
-  "doctor-b"
+const criteriaLoadFairnessState = recordAssignmentForShift(
+  initializeFairnessWorkingState({
+    doctors: EXAMPLE_DOCTORS,
+    criteriaIds: EXAMPLE_BIAS_CRITERIA.map((criteria) => criteria.id)
+  }),
+  "doctor-a",
+  ["criteria-day-all"]
 );
 
-export const weekdayPairLoadScoringExample = scoreCandidates({
+export const criteriaLoadScoringExample = scoreCandidates({
   shift: mondayDayShift,
   eligibility: EXAMPLE_DOCTORS.map((doctor) => ({
     doctorId: doctor.id,
@@ -373,32 +418,30 @@ export const weekdayPairLoadScoringExample = scoreCandidates({
     reasons: []
   })),
   currentBias: EXAMPLE_BIAS_LEDGER,
-  currentWeekdayPairBias: EXAMPLE_WEEKDAY_PAIR_BIAS_LEDGER,
+  matchingCriteria: determineBiasCriteriaForShift({
+    shift: mondayDayShift,
+    shiftType: EXAMPLE_SHIFT_TYPES[0],
+    location: EXAMPLE_DUTY_LOCATIONS[0],
+    activeCriteria: EXAMPLE_BIAS_CRITERIA
+  }),
   offRequests: EMPTY_OFF_REQUESTS,
-  fairnessState: weekdayPairLoadFairnessState,
+  fairnessState: criteriaLoadFairnessState,
   config: DEFAULT_SCHEDULING_ENGINE_CONFIG
 });
-
-const primaryDominanceWeekdayPairBias: ReadonlyArray<WeekdayPairBiasLedger> = [
-  {
-    ...EXAMPLE_WEEKDAY_PAIR_BIAS_LEDGER[0],
-    balance: {
-      ...EXAMPLE_WEEKDAY_PAIR_BIAS_LEDGER[0].balance,
-      mondayDay: -3
-    }
-  },
-  EXAMPLE_WEEKDAY_PAIR_BIAS_LEDGER[1]
-];
 
 const primaryDominanceBias: ReadonlyArray<BiasLedger> = [
   {
     ...EXAMPLE_BIAS_LEDGER[0],
-    balance: {
-      ...EXAMPLE_BIAS_LEDGER[0].balance,
-      weekdayDay: 1
+    balances: {
+      "criteria-day-all": 3
     }
   },
-  EXAMPLE_BIAS_LEDGER[1]
+  {
+    ...EXAMPLE_BIAS_LEDGER[1],
+    balances: {
+      "criteria-day-all": 0
+    }
+  }
 ];
 
 export const primaryBiasDominanceExample = scoreCandidates({
@@ -409,9 +452,17 @@ export const primaryBiasDominanceExample = scoreCandidates({
     reasons: []
   })),
   currentBias: primaryDominanceBias,
-  currentWeekdayPairBias: primaryDominanceWeekdayPairBias,
+  matchingCriteria: determineBiasCriteriaForShift({
+    shift: mondayDayShift,
+    shiftType: EXAMPLE_SHIFT_TYPES[0],
+    location: EXAMPLE_DUTY_LOCATIONS[0],
+    activeCriteria: EXAMPLE_BIAS_CRITERIA
+  }),
   offRequests: EMPTY_OFF_REQUESTS,
-  fairnessState: initializeFairnessWorkingState(EXAMPLE_DOCTORS),
+  fairnessState: initializeFairnessWorkingState({
+    doctors: EXAMPLE_DOCTORS,
+    criteriaIds: EXAMPLE_BIAS_CRITERIA.map((criteria) => criteria.id)
+  }),
   config: DEFAULT_SCHEDULING_ENGINE_CONFIG
 });
 
@@ -422,18 +473,20 @@ export const deterministicAssignmentExample = generateRoster({
     endDate: "2026-04-06"
   },
   doctors: EXAMPLE_DOCTORS,
-  shiftTypes: [EXAMPLE_SHIFT_TYPES[0]],
+  shiftTypes: EXAMPLE_SHIFT_TYPES,
   leaves: [],
   offRequests: EMPTY_OFF_REQUESTS,
   currentBias: EXAMPLE_BIAS_LEDGER,
-  currentWeekdayPairBias: EXAMPLE_WEEKDAY_PAIR_BIAS_LEDGER,
+  activeBiasCriteria: EXAMPLE_BIAS_CRITERIA,
+  activeDutyLocations: EXAMPLE_DUTY_LOCATIONS,
+  generationLocationId: DEFAULT_DUTY_LOCATION_ID,
   weekendGroupSchedule: [],
   generatedByActorId: "system",
   config: DEFAULT_SCHEDULING_ENGINE_CONFIG
 });
 
 const mondayDayConflictShift = findWeekdayPairExampleShift("2026-04-06", "DAY");
-const mondayNightConflictShift = findWeekdayPairExampleShift("2026-04-06", "NIGHT");
+const mondayNightConflictShift = mondayNightShift;
 
 export const oneShiftPerDayValidationExample = validateGeneratedRoster({
   doctors: EXAMPLE_DOCTORS,
@@ -463,6 +516,9 @@ export const oneShiftPerDayValidationExample = validateGeneratedRoster({
       updatedAt: "2026-04-01T00:00:00.000Z"
     }
   ],
+  updatedBias: [],
+  activeBiasCriteria: EXAMPLE_BIAS_CRITERIA,
+  activeDutyLocations: EXAMPLE_DUTY_LOCATIONS,
   weekendGroupSchedule: []
 });
 
@@ -497,10 +553,13 @@ export const restAfterNightValidationExample = validateGeneratedRoster({
       updatedAt: "2026-04-01T00:00:00.000Z"
     }
   ],
+  updatedBias: [],
+  activeBiasCriteria: EXAMPLE_BIAS_CRITERIA,
+  activeDutyLocations: EXAMPLE_DUTY_LOCATIONS,
   weekendGroupSchedule: EXAMPLE_WEEKEND_SCHEDULE
 });
 
 export const generatedBiasOutputsExample = {
   updatedBias: deterministicAssignmentExample.updatedBias,
-  updatedWeekdayPairBias: deterministicAssignmentExample.updatedWeekdayPairBias
+  warnings: deterministicAssignmentExample.warnings
 };

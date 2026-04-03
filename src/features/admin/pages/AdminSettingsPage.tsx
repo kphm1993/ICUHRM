@@ -1,5 +1,5 @@
-import { AdminRosterWorkflowToolsSection } from "@/features/roster/components/AdminRosterWorkflowToolsSection";
-import { DoctorManagementSection } from "@/features/doctors/components/DoctorManagementSection";
+import { Link } from "react-router-dom";
+import { AdminToolsSubnav } from "@/features/admin/components/AdminToolsSubnav";
 
 export function AdminSettingsPage() {
   return (
@@ -12,13 +12,99 @@ export function AdminSettingsPage() {
           Admin Tools
         </h1>
         <p className="mt-3 max-w-3xl text-sm text-slate-600 sm:text-base">
-          Manage roster workflow tools and doctor base data from one admin-only area
-          without mixing these controls into the roster review surface.
+          Access roster lifecycle controls, doctor management, and scheduling
+          configuration from one admin-only area without mixing those tools into the
+          roster review surface.
         </p>
       </header>
 
-      <AdminRosterWorkflowToolsSection />
-      <DoctorManagementSection />
+      <AdminToolsSubnav />
+
+      <section className="grid gap-4 lg:grid-cols-2">
+        <article className="rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-panel">
+          <p className="text-sm font-semibold uppercase tracking-[0.24em] text-brand-700">
+            Workflow
+          </p>
+          <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
+            Roster Workflow Tools
+          </h2>
+          <p className="mt-3 text-sm text-slate-600">
+            Generate draft rosters, publish official snapshots, and lock final months
+            without leaving the admin tools area.
+          </p>
+          <div className="mt-4">
+            <Link
+              className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-brand-300 hover:text-brand-800"
+              to="/admin/rosters"
+            >
+              Open Rosters
+            </Link>
+          </div>
+        </article>
+
+        <article className="rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-panel">
+          <p className="text-sm font-semibold uppercase tracking-[0.24em] text-brand-700">
+            Base Data
+          </p>
+          <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
+            Doctor Management
+          </h2>
+          <p className="mt-3 text-sm text-slate-600">
+            Maintain doctors, weekend groups, and active status safely without
+            rewriting historical roster meaning.
+          </p>
+          <div className="mt-4">
+            <Link
+              className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-brand-300 hover:text-brand-800"
+              to="/admin/doctors"
+            >
+              Manage Doctors
+            </Link>
+          </div>
+        </article>
+
+        <article className="rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-panel">
+          <p className="text-sm font-semibold uppercase tracking-[0.24em] text-brand-700">
+            Configuration
+          </p>
+          <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
+            Duty Locations Manager
+          </h2>
+          <p className="mt-3 text-sm text-slate-600">
+            Create and maintain persisted duty locations that future roster rules and
+            criteria can reference explicitly.
+          </p>
+          <div className="mt-4">
+            <Link
+              className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-brand-300 hover:text-brand-800"
+              to="/admin/locations"
+            >
+              Manage Duty Locations
+            </Link>
+          </div>
+        </article>
+
+        <article className="rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-panel">
+          <p className="text-sm font-semibold uppercase tracking-[0.24em] text-brand-700">
+            Configuration
+          </p>
+          <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
+            Bias Criteria Manager
+          </h2>
+          <p className="mt-3 text-sm text-slate-600">
+            Manage the criteria that now drive future roster scoring while keeping
+            older roster snapshots historically unchanged.
+          </p>
+          <div className="mt-4">
+            <Link
+              className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-brand-300 hover:text-brand-800"
+              to="/admin/bias-criteria"
+            >
+              Manage Bias Criteria
+            </Link>
+          </div>
+        </article>
+      </section>
     </section>
   );
 }

@@ -3,6 +3,7 @@ export type ISODateString = string;
 export type ISODateTimeString = string;
 export type TimeOfDayString = string;
 export type YearMonthString = `${number}-${number}`;
+export type DayOfWeek = "MON" | "TUE" | "WED" | "THU" | "FRI" | "SAT" | "SUN";
 
 export type UserRole = "ADMIN" | "DOCTOR";
 export type ActorRole = UserRole | "SYSTEM";
@@ -27,4 +28,3 @@ export type ExchangeRequestStatus =
   | "ACCEPTED"
   | "REJECTED"
   | "CANCELLED";
-

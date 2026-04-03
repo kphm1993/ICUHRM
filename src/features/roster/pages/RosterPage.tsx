@@ -14,7 +14,8 @@ function AdminRosterPage() {
     doctors: workflow.monthContext?.activeDoctors ?? [],
     snapshot: workflow.displaySnapshot,
     currentBias: workflow.monthContext?.currentBias ?? [],
-    currentWeekdayPairBias: workflow.monthContext?.currentWeekdayPairBias ?? []
+    currentWeekdayPairBias: workflow.monthContext?.currentWeekdayPairBias ?? [],
+    activeBiasCriteria: workflow.monthContext?.activeBiasCriteria ?? []
   });
 
   return (

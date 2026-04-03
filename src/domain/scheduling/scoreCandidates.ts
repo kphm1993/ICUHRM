@@ -1,15 +1,12 @@
 import type { OffRequest, Shift } from "@/domain/models";
-import {
-  readBiasBucketValue,
-  readWeekdayPairBiasBucketValue,
-  resolveShiftBiasBucket,
-  resolveShiftWeekdayPairBiasBucket
-} from "@/domain/scheduling/biasBuckets";
 import type {
   CandidateScore,
   ScoreCandidatesInput
 } from "@/domain/scheduling/contracts";
-import { getDoctorFairnessLoadSnapshot } from "@/domain/scheduling/fairnessState";
+import {
+  getDoctorFairnessLoadSnapshot,
+  sumAssignedCountsForCriteria
+} from "@/domain/scheduling/fairnessState";
 
 function hasConflictingOffRequest(
   offRequest: OffRequest,
@@ -67,23 +64,12 @@ function compareCandidateScores(
           return left.totalScore - right.totalScore;
         }
         break;
-      case "bucketAssignedCount":
+      case "criteriaAssignedCount":
         if (
-          left.tieBreak.bucketAssignedCount !== right.tieBreak.bucketAssignedCount
+          left.tieBreak.criteriaAssignedCount !== right.tieBreak.criteriaAssignedCount
         ) {
           return (
-            left.tieBreak.bucketAssignedCount - right.tieBreak.bucketAssignedCount
-          );
-        }
-        break;
-      case "weekdayPairAssignedCount":
-        if (
-          left.tieBreak.weekdayPairAssignedCount !==
-          right.tieBreak.weekdayPairAssignedCount
-        ) {
-          return (
-            left.tieBreak.weekdayPairAssignedCount -
-            right.tieBreak.weekdayPairAssignedCount
+            left.tieBreak.criteriaAssignedCount - right.tieBreak.criteriaAssignedCount
           );
         }
         break;
@@ -112,15 +98,11 @@ export function scoreCandidates(
   input: ScoreCandidatesInput
 ): ReadonlyArray<CandidateScore> {
   const eligibleCandidates = input.eligibility.filter((entry) => entry.isEligible);
-  const biasBucket = resolveShiftBiasBucket(input.shift);
-  const weekdayPairBiasBucket = resolveShiftWeekdayPairBiasBucket(input.shift);
+  const matchedCriteriaIds = input.matchingCriteria.map((criteria) => criteria.id);
 
   return eligibleCandidates
     .map((candidate) => {
       const biasEntry = input.currentBias.find(
-        (ledger) => ledger.doctorId === candidate.doctorId
-      );
-      const weekdayPairBiasEntry = input.currentWeekdayPairBias.find(
         (ledger) => ledger.doctorId === candidate.doctorId
       );
       const fairnessLoad = getDoctorFairnessLoadSnapshot(
@@ -133,71 +115,53 @@ export function scoreCandidates(
         input.offRequests
       );
       const offRequestPenalty = resolveOffRequestPenalty(conflictingOffRequest, input);
-      const primaryBiasScore =
-        biasEntry && biasBucket
-          ? readBiasBucketValue(biasEntry.balance, biasBucket) *
-            input.config.scoring.biasWeight
-          : 0;
-      const bucketAssignedCount = biasBucket
-        ? fairnessLoad.assignedByBucket[biasBucket]
-        : 0;
-      const primaryBucketLoadScore =
-        bucketAssignedCount * input.config.scoring.bucketAssignedWeight;
-      const weekdayPairAssignedCount = weekdayPairBiasBucket
-        ? fairnessLoad.assignedByWeekdayPair[weekdayPairBiasBucket]
-        : 0;
-      const secondaryWeekdayPairBiasScore =
-        weekdayPairBiasEntry && weekdayPairBiasBucket
-          ? readWeekdayPairBiasBucketValue(
-              weekdayPairBiasEntry.balance,
-              weekdayPairBiasBucket
-            ) * input.config.scoring.weekdayPairBiasWeight
-          : 0;
-      const secondaryWeekdayPairLoadScore =
-        weekdayPairAssignedCount * input.config.scoring.weekdayPairAssignedWeight;
+      const criteriaBiasScore = matchedCriteriaIds.reduce((sum, criteriaId) => {
+        const currentBias = biasEntry?.balances[criteriaId] ?? 0;
+        return sum + currentBias * input.config.scoring.criteriaBiasWeight;
+      }, 0);
+      const criteriaAssignedCount = sumAssignedCountsForCriteria(
+        fairnessLoad,
+        matchedCriteriaIds
+      );
+      const criteriaAssignedLoadScore =
+        criteriaAssignedCount * input.config.scoring.criteriaAssignedWeight;
       const overallLoadScore =
         fairnessLoad.totalAssignedCount * input.config.scoring.overallAssignedWeight;
 
       const breakdown = {
-        primaryBiasScore,
-        primaryBucketLoadScore,
-        secondaryWeekdayPairBiasScore,
-        secondaryWeekdayPairLoadScore,
+        criteriaBiasScore,
+        criteriaAssignedLoadScore,
         offRequestPenalty,
         overallLoadScore
       };
 
       const notes = [
-        "Primary weekday/weekend bucket fairness is scored before secondary weekday pair fairness.",
+        "Primary fairness is scored from the matched active bias criteria for this shift.",
         "Lower scores win, then deterministic tie-breakers are applied."
       ];
 
-      if (!biasBucket || !weekdayPairBiasBucket) {
+      if (matchedCriteriaIds.length === 0) {
         notes.push(
-          "Weekend shifts and weekday custom shifts use neutral weekday-pair bias and load scoring in V1."
+          "No active bias criteria matched this shift, so scoring used only off-request and overall assignment load."
         );
       }
 
       return {
         doctorId: candidate.doctorId,
         totalScore:
-          breakdown.primaryBiasScore +
-          breakdown.primaryBucketLoadScore +
-          breakdown.secondaryWeekdayPairBiasScore +
-          breakdown.secondaryWeekdayPairLoadScore +
+          breakdown.criteriaBiasScore +
+          breakdown.criteriaAssignedLoadScore +
           breakdown.offRequestPenalty +
           breakdown.overallLoadScore,
         breakdown,
         tieBreak: {
-          bucketAssignedCount,
-          weekdayPairAssignedCount,
+          criteriaAssignedCount,
           totalAssignedCount: fairnessLoad.totalAssignedCount,
           offRequestPenalty,
           offRequestPriority: conflictingOffRequest?.priority ?? null,
           doctorId: candidate.doctorId
         },
-        biasBucket,
-        weekdayPairBiasBucket,
+        matchedCriteriaIds,
         notes
       };
     })

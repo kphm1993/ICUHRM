@@ -1,15 +1,15 @@
-import type { BiasBalance, BiasLedger } from "@/domain/models";
+import type { BiasLedger, BiasLedgerBalances } from "@/domain/models";
 import type { BiasLedgerRepository } from "@/domain/repositories";
 import { RepositoryConflictError } from "@/domain/repositories";
 
-function cloneBiasBalance(balance: BiasBalance): BiasBalance {
-  return { ...balance };
+function cloneBiasBalances(balances: BiasLedgerBalances): BiasLedgerBalances {
+  return { ...balances };
 }
 
 function cloneBiasLedger(entry: BiasLedger): BiasLedger {
   return {
     ...entry,
-    balance: cloneBiasBalance(entry.balance)
+    balances: cloneBiasBalances(entry.balances)
   };
 }
 
@@ -48,6 +48,12 @@ export class InMemoryBiasLedgerRepository implements BiasLedgerRepository {
     );
 
     return sortBiasLedgers(entries).map(cloneBiasLedger);
+  }
+
+  async hasAnyBalanceForCriteria(criteriaId: string): Promise<boolean> {
+    return Array.from(this.entriesById.values()).some((entry) =>
+      Object.prototype.hasOwnProperty.call(entry.balances, criteriaId)
+    );
   }
 
   async findByDoctorAndMonth(

@@ -21,6 +21,7 @@ export function generateShiftPool(input: GenerateShiftPoolInput): ReadonlyArray<
         rosterId: input.rosterId,
         date,
         shiftTypeId: shiftType.id,
+        locationId: input.generationLocationId,
         startTime: shiftType.startTime,
         endTime: shiftType.endTime,
         type: shiftType.defaultKind,
@@ -29,6 +30,7 @@ export function generateShiftPool(input: GenerateShiftPoolInput): ReadonlyArray<
         groupEligibility: resolveGroupEligibility(category, special),
         definitionSnapshot: {
           shiftTypeId: shiftType.id,
+          locationId: input.generationLocationId,
           code: shiftType.code,
           label: shiftType.label,
           startTime: shiftType.startTime,

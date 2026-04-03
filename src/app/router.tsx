@@ -1,5 +1,9 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AppShell } from "@/app/layouts/AppShell";
+import { AdminBiasCriteriaPage } from "@/features/admin/pages/AdminBiasCriteriaPage";
+import { AdminDoctorsPage } from "@/features/admin/pages/AdminDoctorsPage";
+import { AdminLocationsPage } from "@/features/admin/pages/AdminLocationsPage";
+import { AdminRostersPage } from "@/features/admin/pages/AdminRostersPage";
 import { AdminSettingsPage } from "@/features/admin/pages/AdminSettingsPage";
 import { LoginPage } from "@/features/auth/pages/LoginPage";
 import { RequireAuth } from "@/features/auth/components/RequireAuth";
@@ -41,6 +45,13 @@ export function AppRouter() {
 
             <Route element={<RequireRole allowedRoles={["ADMIN"]} />}>
               <Route element={<AdminSettingsPage />} path="/admin" />
+              <Route element={<AdminRostersPage />} path="/admin/rosters" />
+              <Route element={<AdminDoctorsPage />} path="/admin/doctors" />
+              <Route element={<AdminLocationsPage />} path="/admin/locations" />
+              <Route
+                element={<AdminBiasCriteriaPage />}
+                path="/admin/bias-criteria"
+              />
             </Route>
           </Route>
         </Route>

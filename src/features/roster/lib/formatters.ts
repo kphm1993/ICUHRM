@@ -1,10 +1,17 @@
 import type {
   BiasBalance,
+  EntityId,
   ISODateString,
   ISODateTimeString,
   WeekdayPairBiasBalance,
   YearMonthString
 } from "@/domain/models";
+
+export interface BiasDisplayEntry {
+  readonly id: EntityId;
+  readonly label: string;
+  readonly value: number;
+}
 
 export function formatRosterMonth(rosterMonth: YearMonthString): string {
   return new Date(`${rosterMonth}-01T00:00:00.000Z`).toLocaleDateString(
@@ -49,6 +56,24 @@ export function formatBiasBalance(balance: BiasBalance): string {
     `Weekend Day ${formatSignedValue(balance.weekendDay)}`,
     `Weekend Night ${formatSignedValue(balance.weekendNight)}`
   ].join(" • ");
+}
+
+export function formatBiasDisplayEntries(
+  entries: ReadonlyArray<BiasDisplayEntry> | null
+): string {
+  if (!entries) {
+    return "Not available";
+  }
+
+  if (entries.length === 0) {
+    return "No criteria tracked";
+  }
+
+  const nonZeroEntries = entries
+    .filter((entry) => entry.value !== 0)
+    .map((entry) => `${entry.label} ${formatSignedValue(entry.value)}`);
+
+  return nonZeroEntries.length > 0 ? nonZeroEntries.join(" | ") : "All zero";
 }
 
 export function formatWeekdayPairBiasBalance(

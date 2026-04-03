@@ -4,13 +4,24 @@ import { formatDateTime } from "@/features/roster/lib/formatters";
 interface RosterLifecycleActionsProps {
   readonly latestDraft: RosterSnapshot | null;
   readonly activeOfficial: RosterSnapshot | null;
+  readonly visibleSnapshot: RosterSnapshot | null;
   readonly viewMode: "draft" | "official";
   readonly onViewModeChange: (value: "draft" | "official") => void;
   readonly canPublish: boolean;
   readonly canLock: boolean;
-  readonly activeAction: "generate" | "publish" | "lock" | null;
+  readonly canDelete: boolean;
+  readonly canUnlock: boolean;
+  readonly activeAction:
+    | "generate"
+    | "publish"
+    | "lock"
+    | "unlock"
+    | "delete"
+    | null;
   readonly onPublish: () => void | Promise<unknown>;
   readonly onLock: () => void | Promise<unknown>;
+  readonly onUnlock: () => void | Promise<unknown>;
+  readonly onDelete: () => void | Promise<unknown>;
 }
 
 function renderSnapshotMeta(snapshot: RosterSnapshot | null, emptyLabel: string) {
@@ -88,6 +99,24 @@ export function RosterLifecycleActions(props: RosterLifecycleActionsProps) {
           Reviewing: {props.viewMode === "draft" ? "Latest Draft" : "Active Official"}
         </div>
         <div className="flex flex-wrap gap-3">
+          {props.visibleSnapshot?.roster.status === "LOCKED" ? (
+            <button
+              className="rounded-full border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-900 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={!props.canUnlock || props.activeAction !== null}
+              onClick={() => {
+                if (
+                  window.confirm(
+                    "Unlock this roster? It will become published again and can then be deleted."
+                  )
+                ) {
+                  void props.onUnlock();
+                }
+              }}
+              type="button"
+            >
+              {props.activeAction === "unlock" ? "Unlocking..." : "Unlock Roster"}
+            </button>
+          ) : null}
           <button
             className="rounded-full border border-brand-300 bg-brand-50 px-4 py-2 text-sm font-semibold text-brand-800 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
             disabled={!props.canPublish || props.activeAction !== null}
@@ -104,6 +133,22 @@ export function RosterLifecycleActions(props: RosterLifecycleActionsProps) {
           >
             {props.activeAction === "lock" ? "Locking..." : "Lock Official Roster"}
           </button>
+          {props.visibleSnapshot &&
+          props.visibleSnapshot.roster.status !== "LOCKED" &&
+          !props.visibleSnapshot.roster.isDeleted ? (
+            <button
+              className="rounded-full border border-rose-300 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-800 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={!props.canDelete || props.activeAction !== null}
+              onClick={() => {
+                if (window.confirm("Delete this roster? This cannot be undone from the UI.")) {
+                  void props.onDelete();
+                }
+              }}
+              type="button"
+            >
+              {props.activeAction === "delete" ? "Deleting..." : "Delete Roster"}
+            </button>
+          ) : null}
         </div>
       </div>
     </section>

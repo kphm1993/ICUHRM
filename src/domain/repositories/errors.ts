@@ -16,3 +16,37 @@ export class RepositoryNotFoundError extends Error {
   }
 }
 
+export class CriteriaInUseError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "CriteriaInUseError";
+  }
+}
+
+export class LocationInUseError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "LocationInUseError";
+  }
+}
+
+export class NoCriteriaDefinedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "NoCriteriaDefinedError";
+  }
+}
+
+export class RosterDeletionError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "RosterDeletionError";
+  }
+}
+
+export class UnauthorizedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "UnauthorizedError";
+  }
+}

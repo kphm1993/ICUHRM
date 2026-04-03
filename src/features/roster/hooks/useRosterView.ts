@@ -52,7 +52,8 @@ export function useRosterView() {
             doctors: nextContext.activeDoctors,
             snapshot: visibleSnapshot,
             currentBias: nextContext.currentBias,
-            currentWeekdayPairBias: nextContext.currentWeekdayPairBias
+            currentWeekdayPairBias: nextContext.currentWeekdayPairBias,
+            activeBiasCriteria: nextContext.activeBiasCriteria
           })
         );
       } catch (error) {

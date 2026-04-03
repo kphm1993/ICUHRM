@@ -1,8 +1,9 @@
 import type {
   Assignment,
-  BiasBalance,
+  BiasCriteria,
   BiasLedger,
   Doctor,
+  DutyLocation,
   EntityId,
   Leave,
   OffRequest,
@@ -10,36 +11,26 @@ import type {
   RosterPeriod,
   Shift,
   ShiftType,
-  WeekdayPairBiasBalance,
-  WeekdayPairBiasBucket,
-  WeekdayPairBiasLedger,
   WeekendGroupScheduleEntry
 } from "@/domain/models";
 import type { SchedulingEngineConfig } from "@/domain/scheduling/config";
 
-export type BiasBucket = "weekdayDay" | "weekdayNight" | "weekendDay" | "weekendNight";
-
-export type BiasBucketCounts = Readonly<Record<BiasBucket, number>>;
-export type WeekdayPairBiasBucketCounts = Readonly<
-  Record<WeekdayPairBiasBucket, number>
->;
+export type CriteriaCountMap = Readonly<Record<EntityId, number>>;
 
 export interface DoctorFairnessLoadSnapshot {
   readonly doctorId: EntityId;
-  readonly eligibleByBucket: BiasBucketCounts;
-  readonly assignedByBucket: BiasBucketCounts;
-  readonly eligibleByWeekdayPair: WeekdayPairBiasBucketCounts;
-  readonly assignedByWeekdayPair: WeekdayPairBiasBucketCounts;
+  readonly eligibleByCriteria: CriteriaCountMap;
+  readonly assignedByCriteria: CriteriaCountMap;
   readonly totalAssignedCount: number;
 }
 
 export interface FairnessWorkingState {
+  readonly criteriaIds: ReadonlyArray<EntityId>;
   readonly doctorSnapshots: Readonly<Record<EntityId, DoctorFairnessLoadSnapshot>>;
 }
 
 export interface CandidateTieBreakMetadata {
-  readonly bucketAssignedCount: number;
-  readonly weekdayPairAssignedCount: number;
+  readonly criteriaAssignedCount: number;
   readonly totalAssignedCount: number;
   readonly offRequestPenalty: number;
   readonly offRequestPriority: PriorityLevel | null;
@@ -52,6 +43,8 @@ export type ValidationIssueCode =
   | "ASSIGNMENT_ON_LEAVE"
   | "ASSIGNMENT_SAME_DAY_CONFLICT"
   | "ASSIGNMENT_REST_AFTER_NIGHT_VIOLATION"
+  | "SHIFT_LOCATION_INVALID"
+  | "BIAS_LEDGER_UNKNOWN_CRITERIA"
   | "ASSIGNMENT_WEEKEND_OFF_GROUP"
   | "ASSIGNMENT_FRIDAY_NIGHT_OFF_GROUP"
   | "MISSING_WEEKEND_GROUP_SCHEDULE";
@@ -77,7 +70,9 @@ export interface GenerateRosterInput {
   readonly leaves: ReadonlyArray<Leave>;
   readonly offRequests: ReadonlyArray<OffRequest>;
   readonly currentBias: ReadonlyArray<BiasLedger>;
-  readonly currentWeekdayPairBias: ReadonlyArray<WeekdayPairBiasLedger>;
+  readonly activeBiasCriteria: ReadonlyArray<BiasCriteria>;
+  readonly activeDutyLocations: ReadonlyArray<DutyLocation>;
+  readonly generationLocationId: EntityId;
   readonly weekendGroupSchedule: ReadonlyArray<WeekendGroupScheduleEntry>;
   readonly generatedByActorId: EntityId;
   readonly config?: SchedulingEngineConfig;
@@ -87,7 +82,6 @@ export interface GenerateRosterOutput {
   readonly shifts: ReadonlyArray<Shift>;
   readonly assignments: ReadonlyArray<Assignment>;
   readonly updatedBias: ReadonlyArray<BiasLedger>;
-  readonly updatedWeekdayPairBias: ReadonlyArray<WeekdayPairBiasLedger>;
   readonly validation: ValidationResult;
   readonly warnings: ReadonlyArray<string>;
 }
@@ -96,6 +90,7 @@ export interface GenerateShiftPoolInput {
   readonly rosterId: EntityId;
   readonly range: RosterPeriod;
   readonly shiftTypes: ReadonlyArray<ShiftType>;
+  readonly generationLocationId: EntityId;
   readonly weekendGroupSchedule: ReadonlyArray<WeekendGroupScheduleEntry>;
 }
 
@@ -115,10 +110,8 @@ export interface CheckEligibilityInput {
 }
 
 export interface CandidateScoreBreakdown {
-  readonly primaryBiasScore: number;
-  readonly primaryBucketLoadScore: number;
-  readonly secondaryWeekdayPairBiasScore: number;
-  readonly secondaryWeekdayPairLoadScore: number;
+  readonly criteriaBiasScore: number;
+  readonly criteriaAssignedLoadScore: number;
   readonly offRequestPenalty: number;
   readonly overallLoadScore: number;
 }
@@ -128,8 +121,7 @@ export interface CandidateScore {
   readonly totalScore: number;
   readonly breakdown: CandidateScoreBreakdown;
   readonly tieBreak: CandidateTieBreakMetadata;
-  readonly biasBucket: BiasBucket | null;
-  readonly weekdayPairBiasBucket: WeekdayPairBiasBucket | null;
+  readonly matchedCriteriaIds: ReadonlyArray<EntityId>;
   readonly notes: ReadonlyArray<string>;
 }
 
@@ -137,7 +129,7 @@ export interface ScoreCandidatesInput {
   readonly shift: Shift;
   readonly eligibility: ReadonlyArray<EligibilityDecision>;
   readonly currentBias: ReadonlyArray<BiasLedger>;
-  readonly currentWeekdayPairBias: ReadonlyArray<WeekdayPairBiasLedger>;
+  readonly matchingCriteria: ReadonlyArray<BiasCriteria>;
   readonly offRequests: ReadonlyArray<OffRequest>;
   readonly fairnessState: FairnessWorkingState;
   readonly config: SchedulingEngineConfig;
@@ -148,15 +140,8 @@ export interface ValidateRosterInput {
   readonly leaves: ReadonlyArray<Leave>;
   readonly shifts: ReadonlyArray<Shift>;
   readonly assignments: ReadonlyArray<Assignment>;
+  readonly updatedBias: ReadonlyArray<BiasLedger>;
+  readonly activeBiasCriteria: ReadonlyArray<BiasCriteria>;
+  readonly activeDutyLocations: ReadonlyArray<DutyLocation>;
   readonly weekendGroupSchedule: ReadonlyArray<WeekendGroupScheduleEntry>;
-}
-
-export interface BiasUpdateEntry {
-  readonly doctorId: EntityId;
-  readonly balance: BiasBalance;
-}
-
-export interface WeekdayPairBiasUpdateEntry {
-  readonly doctorId: EntityId;
-  readonly balance: WeekdayPairBiasBalance;
 }

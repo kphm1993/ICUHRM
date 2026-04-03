@@ -1,6 +1,8 @@
 import type {
   Assignment,
+  BiasCriteria,
   BiasLedger,
+  DutyLocation,
   GeneratedRosterInputSummary,
   RosterSnapshotDoctorReference,
   RosterSnapshot,
@@ -39,7 +41,16 @@ function cloneDoctorReference(
 function cloneBiasLedger(entry: BiasLedger): BiasLedger {
   return {
     ...entry,
-    balance: { ...entry.balance }
+    balances: { ...entry.balances }
+  };
+}
+
+function normalizeBiasLedger(
+  entry: BiasLedger & { balance?: BiasLedger["balances"] }
+): BiasLedger {
+  return {
+    ...entry,
+    balances: { ...(entry.balances ?? entry.balance ?? {}) }
   };
 }
 
@@ -65,7 +76,16 @@ function cloneGeneratedInputSummary(
   return {
     ...summary,
     range: { ...summary.range },
-    weekendGroupSchedule: summary.weekendGroupSchedule.map((entry) => ({ ...entry }))
+    weekendGroupSchedule: summary.weekendGroupSchedule.map((entry) => ({ ...entry })),
+    activeBiasCriteria: (summary.activeBiasCriteria ?? []).map((criteria) => ({
+      ...criteria,
+      locationIds: [...criteria.locationIds],
+      shiftTypeIds: [...criteria.shiftTypeIds],
+      weekdayConditions: [...criteria.weekdayConditions]
+    })),
+    activeDutyLocations: (summary.activeDutyLocations ?? []).map((location) => ({
+      ...location
+    }))
   };
 }
 
@@ -74,6 +94,9 @@ function cloneRosterSnapshot(snapshot: RosterSnapshot): RosterSnapshot {
     ...snapshot,
     roster: {
       ...snapshot.roster,
+      isDeleted: snapshot.roster.isDeleted,
+      deletedAt: snapshot.roster.deletedAt,
+      deletedByActorId: snapshot.roster.deletedByActorId,
       period: { ...snapshot.roster.period },
       weekendGroupSchedule: snapshot.roster.weekendGroupSchedule.map((entry) => ({
         ...entry
@@ -89,6 +112,26 @@ function cloneRosterSnapshot(snapshot: RosterSnapshot): RosterSnapshot {
       cloneWeekdayPairBiasLedger
     ),
     generatedInputSummary: cloneGeneratedInputSummary(snapshot.generatedInputSummary)
+  };
+}
+
+function normalizeGeneratedInputSummary(
+  summary: GeneratedRosterInputSummary & {
+    activeBiasCriteria?: ReadonlyArray<BiasCriteria>;
+    activeDutyLocations?: ReadonlyArray<DutyLocation>;
+  }
+): GeneratedRosterInputSummary {
+  return {
+    ...summary,
+    activeBiasCriteria: (summary.activeBiasCriteria ?? []).map((criteria) => ({
+      ...criteria,
+      locationIds: [...criteria.locationIds],
+      shiftTypeIds: [...criteria.shiftTypeIds],
+      weekdayConditions: [...criteria.weekdayConditions]
+    })),
+    activeDutyLocations: (summary.activeDutyLocations ?? []).map((location) => ({
+      ...location
+    }))
   };
 }
 
@@ -162,8 +205,27 @@ export class LocalStorageRosterSnapshotRepository
   }
 
   private readEntries(): RosterSnapshot[] {
-    return readCollectionFromStorage(this.storageKey, this.seedData).map(
-      cloneRosterSnapshot
+    return readCollectionFromStorage(this.storageKey, this.seedData).map((snapshot) =>
+      cloneRosterSnapshot({
+        ...snapshot,
+        roster: {
+          ...snapshot.roster,
+          isDeleted: snapshot.roster.isDeleted ?? false,
+          deletedAt: snapshot.roster.deletedAt,
+          deletedByActorId: snapshot.roster.deletedByActorId
+        },
+        updatedBias: snapshot.updatedBias.map((entry) =>
+          normalizeBiasLedger(
+            entry as BiasLedger & { balance?: BiasLedger["balances"] }
+          )
+        ),
+        generatedInputSummary: normalizeGeneratedInputSummary(
+          snapshot.generatedInputSummary as GeneratedRosterInputSummary & {
+            activeBiasCriteria?: ReadonlyArray<BiasCriteria>;
+            activeDutyLocations?: ReadonlyArray<DutyLocation>;
+          }
+        )
+      } as RosterSnapshot)
     );
   }
 

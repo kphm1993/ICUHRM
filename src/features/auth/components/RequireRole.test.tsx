@@ -25,6 +25,30 @@ function renderRequireRole(role: "ADMIN" | "DOCTOR" | null) {
   );
 }
 
+function renderRequireRoleRoute(options: {
+  readonly role: "ADMIN" | "DOCTOR" | null;
+  readonly initialEntry: string;
+  readonly protectedPath: string;
+  readonly protectedLabel: string;
+}) {
+  mockUseAuth.mockReturnValue({ role: options.role });
+
+  return render(
+    <MemoryRouter initialEntries={[options.initialEntry]}>
+      <Routes>
+        <Route element={<RequireRole allowedRoles={["ADMIN"]} />}>
+          <Route
+            element={<div>{options.protectedLabel}</div>}
+            path={options.protectedPath}
+          />
+        </Route>
+        <Route element={<div>Roster Page</div>} path="/roster" />
+        <Route element={<div>Login Page</div>} path="/login" />
+      </Routes>
+    </MemoryRouter>
+  );
+}
+
 describe("RequireRole", () => {
   beforeEach(() => {
     mockUseAuth.mockReset();
@@ -47,5 +71,101 @@ describe("RequireRole", () => {
     renderRequireRole(null);
 
     expect(screen.getByText("Login Page")).toBeInTheDocument();
+  });
+
+  it("redirects doctor users away from /admin/locations", () => {
+    renderRequireRoleRoute({
+      role: "DOCTOR",
+      initialEntry: "/admin/locations",
+      protectedPath: "/admin/locations",
+      protectedLabel: "Locations Page"
+    });
+
+    expect(screen.getByText("Roster Page")).toBeInTheDocument();
+    expect(screen.queryByText("Locations Page")).not.toBeInTheDocument();
+  });
+
+  it("allows admin users to access /admin/locations", () => {
+    renderRequireRoleRoute({
+      role: "ADMIN",
+      initialEntry: "/admin/locations",
+      protectedPath: "/admin/locations",
+      protectedLabel: "Locations Page"
+    });
+
+    expect(screen.getByText("Locations Page")).toBeInTheDocument();
+    expect(screen.queryByText("Roster Page")).not.toBeInTheDocument();
+  });
+
+  it("redirects doctor users away from /admin/rosters", () => {
+    renderRequireRoleRoute({
+      role: "DOCTOR",
+      initialEntry: "/admin/rosters",
+      protectedPath: "/admin/rosters",
+      protectedLabel: "Rosters Page"
+    });
+
+    expect(screen.getByText("Roster Page")).toBeInTheDocument();
+    expect(screen.queryByText("Rosters Page")).not.toBeInTheDocument();
+  });
+
+  it("allows admin users to access /admin/rosters", () => {
+    renderRequireRoleRoute({
+      role: "ADMIN",
+      initialEntry: "/admin/rosters",
+      protectedPath: "/admin/rosters",
+      protectedLabel: "Rosters Page"
+    });
+
+    expect(screen.getByText("Rosters Page")).toBeInTheDocument();
+    expect(screen.queryByText("Roster Page")).not.toBeInTheDocument();
+  });
+
+  it("redirects doctor users away from /admin/doctors", () => {
+    renderRequireRoleRoute({
+      role: "DOCTOR",
+      initialEntry: "/admin/doctors",
+      protectedPath: "/admin/doctors",
+      protectedLabel: "Doctors Page"
+    });
+
+    expect(screen.getByText("Roster Page")).toBeInTheDocument();
+    expect(screen.queryByText("Doctors Page")).not.toBeInTheDocument();
+  });
+
+  it("allows admin users to access /admin/doctors", () => {
+    renderRequireRoleRoute({
+      role: "ADMIN",
+      initialEntry: "/admin/doctors",
+      protectedPath: "/admin/doctors",
+      protectedLabel: "Doctors Page"
+    });
+
+    expect(screen.getByText("Doctors Page")).toBeInTheDocument();
+    expect(screen.queryByText("Roster Page")).not.toBeInTheDocument();
+  });
+
+  it("redirects doctor users away from /admin/bias-criteria", () => {
+    renderRequireRoleRoute({
+      role: "DOCTOR",
+      initialEntry: "/admin/bias-criteria",
+      protectedPath: "/admin/bias-criteria",
+      protectedLabel: "Bias Criteria Page"
+    });
+
+    expect(screen.getByText("Roster Page")).toBeInTheDocument();
+    expect(screen.queryByText("Bias Criteria Page")).not.toBeInTheDocument();
+  });
+
+  it("allows admin users to access /admin/bias-criteria", () => {
+    renderRequireRoleRoute({
+      role: "ADMIN",
+      initialEntry: "/admin/bias-criteria",
+      protectedPath: "/admin/bias-criteria",
+      protectedLabel: "Bias Criteria Page"
+    });
+
+    expect(screen.getByText("Bias Criteria Page")).toBeInTheDocument();
+    expect(screen.queryByText("Roster Page")).not.toBeInTheDocument();
   });
 });

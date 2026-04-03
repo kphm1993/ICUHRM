@@ -23,11 +23,15 @@ Fairness is calculated relative to availability:
 
 fairness_ratio = assigned_shifts / eligible_shifts
 
-Tracked separately:
-- weekday_day
-- weekday_night
-- weekend_day
-- weekend_night
+Tracked by **admin-defined bias criteria** (see section 5.1 below).
+
+Admins can create custom fairness dimensions by combining:
+- Duty locations (e.g., CCU, ICCU)
+- Shift types (e.g., DAY, NIGHT)
+- Individual weekdays (MON, TUE, WED, THU, FRI, SAT, SUN)
+- Weekends (combining SAT/SUN)
+
+Example: "CCU Monday Night" tracks only shifts in CCU on Mondays with night type.
 
 ---
 
@@ -57,6 +61,7 @@ Tracked separately:
 Shift {
   id
   date
+  location_id (reference to DutyLocation)
   start_time
   end_time
   type: DAY | NIGHT | CUSTOM
@@ -73,7 +78,7 @@ Shift {
 
 ---
 
-### 3.3 ADMIN-CONTROLLED SHIFT CONFIGURATION (NEW)
+### 3.3 ADMIN-CONTROLLED SHIFT CONFIGURATION
 
 Admin can:
 
@@ -82,17 +87,21 @@ Admin can:
 - Edit existing shift types
 - Delete shift types (if unused)
 
+### 3.4 ADMIN-CONTROLLED DUTY LOCATIONS (NEW)
+
+Admin can:
+
+- Create new duty locations (e.g., CCU, ICCU, Surgical ICU)
+- Edit location name and description
+- Deactivate or delete locations (if no shifts reference them)
+
 Example:
 
-ShiftType {
-  name: "DAY"
-  start_time: "08:00"
-  end_time: "20:00"
+DutyLocation {
+  code: "CCU"
+  label: "Cardiac Care Unit"
+  description: "High-acuity cardiac patients"
 }
-
-IMPORTANT:
-- All future roster generations use updated shift definitions
-- Past rosters remain unchanged (immutable history)
 
 ---
 
@@ -114,77 +123,85 @@ Rules:
 
 ---
 
-## 5. BIAS SYSTEM
+## 5. BIAS SYSTEM (DYNAMIC)
 
-### 5.1 Bias Ledger
+### 5.1 Bias Criteria (NEW)
+
+Instead of hardcoded fairness buckets, admins define custom tracking criteria.
+
+BiasCriteria {
+  id (unique identifier)
+  code (unique string, e.g., "CCU_MONDAY_NIGHT")
+  label (human-readable, e.g., "CCU Monday Night Shifts")
+  locationIds [] (empty = all locations)
+  shiftTypeIds [] (empty = all shift types)
+  weekdayConditions [] (empty = all days; can specify MON, TUE, WED, THU, FRI, SAT, SUN)
+  isWeekendOnly (boolean; if true, applies only to weekend days)
+  isActive (boolean)
+}
+
+A shift matches a criteria if ALL of:
+- shift location is in locationIds (or locationIds is empty)
+- shift type is in shiftTypeIds (or shiftTypeIds is empty)
+- shift day is in weekdayConditions (or weekdayConditions is empty)
+- if isWeekendOnly=true, shift must be on Saturday or Sunday
+
+Example criteria:
+- code="CCU_ALL", label="All CCU Shifts", locationIds=[CCU], weekdayConditions=[], shiftTypeIds=[] → matches all shifts in CCU
+- code="MONDAY_NIGHT", label="Monday Night (All Locations)", locationIds=[], weekdayConditions=[MON], shiftTypeIds=[NIGHT] → matches night shifts on Mondays
+- code="WEEKEND", label="All Weekend Shifts", locationIds=[], weekdayConditions=[SAT,SUN], shiftTypeIds=[] → matches all weekend shifts
+
+### 5.2 Bias Ledger
 
 BiasLedger {
   doctor_id
-  weekday_day
-  weekday_night
-  weekend_day
-  weekend_night
+  effective_month
+  balances: {
+    [criteria_id]: numeric_bias_value,
+    [criteria_id_2]: numeric_bias_value,
+    ...
+  }
 }
 
-WeekdayPairBiasLedger {
-  doctor_id
-  monday_day
-  monday_night
-  tuesday_day
-  tuesday_night
-  wednesday_day
-  wednesday_night
-  thursday_day
-  thursday_night
-  friday_day
-  friday_night
-}
+Each doctor has a bias balance for each active criteria (not hardcoded buckets).
 
-Weekday pair bias is tracked separately from total weekday day/night bias.
+### 5.3 Bias Interpretation
 
-Primary fairness priority:
-- equalize total weekday day counts
-- equalize total weekday night counts
-- equalize total weekend day counts
-- equalize total weekend night counts
+- Positive = over-assigned (doctor has done more shifts in this criteria)
+- Negative = under-assigned (doctor has done fewer shifts in this criteria)
+- Used in next month roster generation to rebalance
+- Bias is accrued per criteria independently
 
-Secondary fairness priority:
-- equalize weekday duty-and-day pairs
-  (e.g. Tuesday night, Monday day, Friday night)
-
-The scheduling engine must always prioritize correcting total bucket bias before correcting weekday pair bias.
-
-Pair bias should influence candidate scoring only after primary total fairness is preserved as much as possible.
-
----
-
-### 5.2 Bias Behavior
-
-- Positive = over-assigned
-- Negative = under-assigned
-- Used in next month roster generation
-
----
-
-### 5.3 ADMIN BIAS CONTROL (NEW)
+### 5.4 ADMIN BIAS CRITERIA MANAGEMENT (NEW)
 
 Admin can:
 
-#### A. Reset All Bias
-- Set all doctors' bias to zero
+#### A. Create Bias Criteria
+- Define custom tracking dimension
+- Configure location, shift type, and day conditions
+- Activate immediately or later
 
-#### B. Reset Individual Doctor Bias
-- Reset selected doctor only
+#### B. Edit Criteria
+- Modify label, location/shift/day conditions
+- Only affects future rosters (past rosters unaffected)
 
-#### C. Manual Bias Adjustment
-- Add or subtract bias manually
+#### C. Deactivate/Delete Criteria
+- Deactivate: criteria no longer tracked in future rosters, but past data preserved
+- Delete: only allowed if no past rosters reference it
 
-Example:
-+2 weekday_night
--1 weekend_day
+#### D. Reset All Bias (Existing)
+- Set all doctors' bias to zero across all criteria
+
+#### E. Reset Individual Doctor Bias (Existing)
+- Reset selected doctor's bias across all criteria
+
+#### F. Manual Bias Adjustment (Existing)
+- Add or subtract bias manually per doctor, per criteria
 
 IMPORTANT:
-- All bias changes must be logged in audit log
+- App initializes with **zero criteria defined**
+- Admin must create at least one criteria before roster generation
+- All criteria mutations are audit-logged
 
 ---
 
@@ -259,8 +276,10 @@ OffRequest {
 - Doctors
 - Leaves
 - Off requests
-- Bias ledger
+- Bias ledger (with balances keyed by active criteria)
 - Shift definitions
+- Duty locations reference
+- Active bias criteria (admin-defined)
 
 ---
 

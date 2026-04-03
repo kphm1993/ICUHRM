@@ -1,49 +1,22 @@
+import type { Doctor, EntityId } from "@/domain/models";
 import type {
-  Doctor,
-  EntityId,
-  Shift,
-  WeekdayPairBiasBucket
-} from "@/domain/models";
-import {
-  createEmptyBiasBucketCounts,
-  createEmptyWeekdayPairBiasBucketCounts,
-  resolveShiftBiasBucket
-  ,
-  resolveShiftWeekdayPairBiasBucket
-} from "@/domain/scheduling/biasBuckets";
-import type {
-  BiasBucket,
-  BiasBucketCounts,
+  CriteriaCountMap,
   DoctorFairnessLoadSnapshot,
   EligibilityDecision,
-  FairnessWorkingState,
-  WeekdayPairBiasBucketCounts
+  FairnessWorkingState
 } from "@/domain/scheduling/contracts";
 
-function cloneBucketCounts(counts: BiasBucketCounts): BiasBucketCounts {
-  return {
-    weekdayDay: counts.weekdayDay,
-    weekdayNight: counts.weekdayNight,
-    weekendDay: counts.weekendDay,
-    weekendNight: counts.weekendNight
-  };
+function cloneCriteriaCountMap(counts: CriteriaCountMap): CriteriaCountMap {
+  return { ...counts };
 }
 
-function cloneWeekdayPairBucketCounts(
-  counts: WeekdayPairBiasBucketCounts
-): WeekdayPairBiasBucketCounts {
-  return {
-    mondayDay: counts.mondayDay,
-    mondayNight: counts.mondayNight,
-    tuesdayDay: counts.tuesdayDay,
-    tuesdayNight: counts.tuesdayNight,
-    wednesdayDay: counts.wednesdayDay,
-    wednesdayNight: counts.wednesdayNight,
-    thursdayDay: counts.thursdayDay,
-    thursdayNight: counts.thursdayNight,
-    fridayDay: counts.fridayDay,
-    fridayNight: counts.fridayNight
-  };
+function createEmptyCriteriaCountMap(
+  criteriaIds: ReadonlyArray<EntityId>
+): CriteriaCountMap {
+  return criteriaIds.reduce<Record<EntityId, number>>((result, criteriaId) => {
+    result[criteriaId] = 0;
+    return result;
+  }, {});
 }
 
 function cloneDoctorFairnessSnapshot(
@@ -51,56 +24,55 @@ function cloneDoctorFairnessSnapshot(
 ): DoctorFairnessLoadSnapshot {
   return {
     doctorId: snapshot.doctorId,
-    eligibleByBucket: cloneBucketCounts(snapshot.eligibleByBucket),
-    assignedByBucket: cloneBucketCounts(snapshot.assignedByBucket),
-    eligibleByWeekdayPair: cloneWeekdayPairBucketCounts(
-      snapshot.eligibleByWeekdayPair
-    ),
-    assignedByWeekdayPair: cloneWeekdayPairBucketCounts(
-      snapshot.assignedByWeekdayPair
-    ),
+    eligibleByCriteria: cloneCriteriaCountMap(snapshot.eligibleByCriteria),
+    assignedByCriteria: cloneCriteriaCountMap(snapshot.assignedByCriteria),
     totalAssignedCount: snapshot.totalAssignedCount
   };
 }
 
-function createDoctorFairnessSnapshot(doctorId: EntityId): DoctorFairnessLoadSnapshot {
+function createDoctorFairnessSnapshot(
+  doctorId: EntityId,
+  criteriaIds: ReadonlyArray<EntityId>
+): DoctorFairnessLoadSnapshot {
   return {
     doctorId,
-    eligibleByBucket: createEmptyBiasBucketCounts(),
-    assignedByBucket: createEmptyBiasBucketCounts(),
-    eligibleByWeekdayPair: createEmptyWeekdayPairBiasBucketCounts(),
-    assignedByWeekdayPair: createEmptyWeekdayPairBiasBucketCounts(),
+    eligibleByCriteria: createEmptyCriteriaCountMap(criteriaIds),
+    assignedByCriteria: createEmptyCriteriaCountMap(criteriaIds),
     totalAssignedCount: 0
   };
 }
 
-function incrementBucketCount(
-  counts: BiasBucketCounts,
-  bucket: BiasBucket
-): BiasBucketCounts {
-  return {
-    ...counts,
-    [bucket]: counts[bucket] + 1
+function incrementCriteriaCounts(
+  counts: CriteriaCountMap,
+  criteriaIds: ReadonlyArray<EntityId>
+): CriteriaCountMap {
+  if (criteriaIds.length === 0) {
+    return cloneCriteriaCountMap(counts);
+  }
+
+  const nextCounts: Record<EntityId, number> = {
+    ...counts
   };
+
+  for (const criteriaId of criteriaIds) {
+    nextCounts[criteriaId] = (nextCounts[criteriaId] ?? 0) + 1;
+  }
+
+  return nextCounts;
 }
 
-function incrementWeekdayPairBucketCount(
-  counts: WeekdayPairBiasBucketCounts,
-  bucket: WeekdayPairBiasBucket
-): WeekdayPairBiasBucketCounts {
+export function initializeFairnessWorkingState(input: {
+  readonly doctors: ReadonlyArray<Doctor>;
+  readonly criteriaIds: ReadonlyArray<EntityId>;
+}): FairnessWorkingState {
   return {
-    ...counts,
-    [bucket]: counts[bucket] + 1
-  };
-}
-
-export function initializeFairnessWorkingState(
-  doctors: ReadonlyArray<Doctor>
-): FairnessWorkingState {
-  return {
-    doctorSnapshots: doctors.reduce<Record<EntityId, DoctorFairnessLoadSnapshot>>(
+    criteriaIds: [...input.criteriaIds],
+    doctorSnapshots: input.doctors.reduce<Record<EntityId, DoctorFairnessLoadSnapshot>>(
       (result, doctor) => {
-        result[doctor.id] = createDoctorFairnessSnapshot(doctor.id);
+        result[doctor.id] = createDoctorFairnessSnapshot(
+          doctor.id,
+          input.criteriaIds
+        );
         return result;
       },
       {}
@@ -113,19 +85,17 @@ export function getDoctorFairnessLoadSnapshot(
   doctorId: EntityId
 ): DoctorFairnessLoadSnapshot {
   return cloneDoctorFairnessSnapshot(
-    state.doctorSnapshots[doctorId] ?? createDoctorFairnessSnapshot(doctorId)
+    state.doctorSnapshots[doctorId] ??
+      createDoctorFairnessSnapshot(doctorId, state.criteriaIds)
   );
 }
 
 export function recordEligibilityForShift(
   state: FairnessWorkingState,
-  shift: Shift,
-  decisions: ReadonlyArray<EligibilityDecision>
+  decisions: ReadonlyArray<EligibilityDecision>,
+  matchingCriteriaIds: ReadonlyArray<EntityId>
 ): FairnessWorkingState {
-  const bucket = resolveShiftBiasBucket(shift);
-  const weekdayPairBucket = resolveShiftWeekdayPairBiasBucket(shift);
-
-  if (!bucket && !weekdayPairBucket) {
+  if (matchingCriteriaIds.length === 0) {
     return state;
   }
 
@@ -136,50 +106,45 @@ export function recordEligibilityForShift(
       continue;
     }
 
-    const currentSnapshot = nextSnapshots[decision.doctorId] ?? createDoctorFairnessSnapshot(decision.doctorId);
+    const currentSnapshot =
+      nextSnapshots[decision.doctorId] ??
+      createDoctorFairnessSnapshot(decision.doctorId, state.criteriaIds);
+
     nextSnapshots[decision.doctorId] = {
       ...currentSnapshot,
-      eligibleByBucket: bucket
-        ? incrementBucketCount(currentSnapshot.eligibleByBucket, bucket)
-        : cloneBucketCounts(currentSnapshot.eligibleByBucket),
-      eligibleByWeekdayPair: weekdayPairBucket
-        ? incrementWeekdayPairBucketCount(
-            currentSnapshot.eligibleByWeekdayPair,
-            weekdayPairBucket
-          )
-        : cloneWeekdayPairBucketCounts(currentSnapshot.eligibleByWeekdayPair)
+      eligibleByCriteria: incrementCriteriaCounts(
+        currentSnapshot.eligibleByCriteria,
+        matchingCriteriaIds
+      )
     };
   }
 
   return {
+    ...state,
     doctorSnapshots: nextSnapshots
   };
 }
 
 export function recordAssignmentForShift(
   state: FairnessWorkingState,
-  shift: Shift,
-  doctorId: EntityId
+  doctorId: EntityId,
+  matchingCriteriaIds: ReadonlyArray<EntityId>
 ): FairnessWorkingState {
-  const bucket = resolveShiftBiasBucket(shift);
-  const weekdayPairBucket = resolveShiftWeekdayPairBiasBucket(shift);
-  const currentSnapshot = state.doctorSnapshots[doctorId] ?? createDoctorFairnessSnapshot(doctorId);
+  const currentSnapshot =
+    state.doctorSnapshots[doctorId] ??
+    createDoctorFairnessSnapshot(doctorId, state.criteriaIds);
 
   const nextSnapshot: DoctorFairnessLoadSnapshot = {
     ...currentSnapshot,
-    assignedByBucket: bucket
-      ? incrementBucketCount(currentSnapshot.assignedByBucket, bucket)
-      : cloneBucketCounts(currentSnapshot.assignedByBucket),
-    assignedByWeekdayPair: weekdayPairBucket
-      ? incrementWeekdayPairBucketCount(
-          currentSnapshot.assignedByWeekdayPair,
-          weekdayPairBucket
-        )
-      : cloneWeekdayPairBucketCounts(currentSnapshot.assignedByWeekdayPair),
+    assignedByCriteria: incrementCriteriaCounts(
+      currentSnapshot.assignedByCriteria,
+      matchingCriteriaIds
+    ),
     totalAssignedCount: currentSnapshot.totalAssignedCount + 1
   };
 
   return {
+    ...state,
     doctorSnapshots: {
       ...state.doctorSnapshots,
       [doctorId]: nextSnapshot
@@ -187,38 +152,34 @@ export function recordAssignmentForShift(
   };
 }
 
-export function countGeneratedShiftsByBucket(
-  shifts: ReadonlyArray<Shift>
-): BiasBucketCounts {
-  return shifts.reduce<BiasBucketCounts>((counts, shift) => {
-    const bucket = resolveShiftBiasBucket(shift);
+export function countGeneratedShiftsByCriteria(
+  criteriaIdsByShiftId: ReadonlyMap<EntityId, ReadonlyArray<EntityId>>
+): CriteriaCountMap {
+  const counts: Record<EntityId, number> = {};
 
-    if (!bucket) {
-      return counts;
+  for (const criteriaIds of criteriaIdsByShiftId.values()) {
+    for (const criteriaId of criteriaIds) {
+      counts[criteriaId] = (counts[criteriaId] ?? 0) + 1;
     }
+  }
 
-    return incrementBucketCount(counts, bucket);
-  }, createEmptyBiasBucketCounts());
+  return counts;
 }
 
-export function countGeneratedShiftsByWeekdayPair(
-  shifts: ReadonlyArray<Shift>
-): WeekdayPairBiasBucketCounts {
-  return shifts.reduce<WeekdayPairBiasBucketCounts>((counts, shift) => {
-    const weekdayPairBucket = resolveShiftWeekdayPairBiasBucket(shift);
-
-    if (!weekdayPairBucket) {
-      return counts;
-    }
-
-    return incrementWeekdayPairBucketCount(counts, weekdayPairBucket);
-  }, createEmptyWeekdayPairBiasBucketCounts());
+export function sumAssignedCountsForCriteria(
+  snapshot: DoctorFairnessLoadSnapshot,
+  criteriaIds: ReadonlyArray<EntityId>
+): number {
+  return criteriaIds.reduce(
+    (sum, criteriaId) => sum + (snapshot.assignedByCriteria[criteriaId] ?? 0),
+    0
+  );
 }
 
 export function computeAvailabilityAwareFairShare(
   state: FairnessWorkingState,
   doctorId: EntityId,
-  bucket: BiasBucket,
+  criteriaId: EntityId,
   totalShiftCount: number
 ): number {
   const doctorSnapshot = state.doctorSnapshots[doctorId];
@@ -228,31 +189,7 @@ export function computeAvailabilityAwareFairShare(
   }
 
   const totalEligibleAppearances = Object.values(state.doctorSnapshots).reduce(
-    (sum, snapshot) => sum + snapshot.eligibleByBucket[bucket],
-    0
-  );
-
-  if (totalEligibleAppearances === 0 || totalShiftCount === 0) {
-    return 0;
-  }
-
-  return (totalShiftCount * doctorSnapshot.eligibleByBucket[bucket]) / totalEligibleAppearances;
-}
-
-export function computeAvailabilityAwareWeekdayPairFairShare(
-  state: FairnessWorkingState,
-  doctorId: EntityId,
-  bucket: WeekdayPairBiasBucket,
-  totalShiftCount: number
-): number {
-  const doctorSnapshot = state.doctorSnapshots[doctorId];
-
-  if (!doctorSnapshot) {
-    return 0;
-  }
-
-  const totalEligibleAppearances = Object.values(state.doctorSnapshots).reduce(
-    (sum, snapshot) => sum + snapshot.eligibleByWeekdayPair[bucket],
+    (sum, snapshot) => sum + (snapshot.eligibleByCriteria[criteriaId] ?? 0),
     0
   );
 
@@ -261,6 +198,6 @@ export function computeAvailabilityAwareWeekdayPairFairShare(
   }
 
   return (
-    totalShiftCount * doctorSnapshot.eligibleByWeekdayPair[bucket]
+    totalShiftCount * (doctorSnapshot.eligibleByCriteria[criteriaId] ?? 0)
   ) / totalEligibleAppearances;
 }

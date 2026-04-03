@@ -1,6 +1,7 @@
 import type { RosterDoctorSummaryRow } from "@/features/roster/selectors/rosterReviewSelectors";
 import {
   formatBiasBalance,
+  formatBiasDisplayEntries,
   formatWeekdayPairBiasBalance
 } from "@/features/roster/lib/formatters";
 
@@ -50,13 +51,26 @@ export function FairnessComparisonTable(props: FairnessComparisonTableProps) {
 
             <div className="mt-3 space-y-2 text-sm text-slate-700">
               <p>
-                <span className="font-semibold text-slate-900">Carry-forward bias:</span>{" "}
-                {formatBiasBalance(row.currentBias)}
+                <span className="font-semibold text-slate-900">
+                  {row.primaryBiasMode === "criteria"
+                    ? "Carry-forward criteria bias:"
+                    : "Carry-forward bias:"}
+                </span>{" "}
+                {row.primaryBiasMode === "criteria"
+                  ? formatBiasDisplayEntries(row.currentPrimaryBiasEntries)
+                  : formatBiasBalance(row.currentBias ?? {
+                      weekdayDay: 0,
+                      weekdayNight: 0,
+                      weekendDay: 0,
+                      weekendNight: 0
+                    })}
               </p>
-              <p>
-                <span className="font-semibold text-slate-900">Weekday-pair bias:</span>{" "}
-                {formatWeekdayPairBiasBalance(row.currentWeekdayPairBias)}
-              </p>
+              {row.showWeekdayPairBias ? (
+                <p>
+                  <span className="font-semibold text-slate-900">Weekday-pair bias:</span>{" "}
+                  {formatWeekdayPairBiasBalance(row.currentWeekdayPairBias)}
+                </p>
+              ) : null}
             </div>
           </article>
         ))}

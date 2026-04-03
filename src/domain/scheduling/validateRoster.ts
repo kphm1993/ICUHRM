@@ -47,6 +47,12 @@ export function validateGeneratedRoster(
   const assignmentsPerShift = new Map<string, number>();
   const assignmentsByShift = new Map<string, Assignment[]>();
   const shiftsById = new Map(input.shifts.map((shift) => [shift.id, shift] as const));
+  const activeLocationIds = new Set(
+    input.activeDutyLocations.map((location) => location.id)
+  );
+  const activeCriteriaIds = new Set(
+    input.activeBiasCriteria.map((criteria) => criteria.id)
+  );
 
   for (const assignment of input.assignments) {
     const currentCount = assignmentsPerShift.get(assignment.shiftId) ?? 0;
@@ -78,6 +84,14 @@ export function validateGeneratedRoster(
   for (const shift of input.shifts) {
     const shiftAssignmentCount = assignmentsPerShift.get(shift.id) ?? 0;
     addMissingWeekendScheduleIssue(issues, shift, input);
+
+    if (!activeLocationIds.has(shift.locationId)) {
+      issues.push({
+        code: "SHIFT_LOCATION_INVALID",
+        message: `Shift ${shift.id} references duty location ${shift.locationId}, which is not part of the active generation snapshot.`,
+        shiftId: shift.id
+      });
+    }
 
     if (shiftAssignmentCount === 0) {
       issues.push({
@@ -146,6 +160,20 @@ export function validateGeneratedRoster(
           doctorId: doctor.id
         });
       }
+    }
+  }
+
+  for (const ledger of input.updatedBias) {
+    for (const criteriaId of Object.keys(ledger.balances)) {
+      if (activeCriteriaIds.has(criteriaId)) {
+        continue;
+      }
+
+      issues.push({
+        code: "BIAS_LEDGER_UNKNOWN_CRITERIA",
+        message: `Updated bias ledger ${ledger.id} for doctor ${ledger.doctorId} references unknown criteria ${criteriaId}.`,
+        doctorId: ledger.doctorId
+      });
     }
   }
 

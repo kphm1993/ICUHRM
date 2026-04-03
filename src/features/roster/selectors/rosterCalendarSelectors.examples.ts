@@ -1,4 +1,8 @@
-import type { Doctor, RosterSnapshot } from "@/domain/models";
+import {
+  DEFAULT_DUTY_LOCATION_ID,
+  type Doctor,
+  type RosterSnapshot
+} from "@/domain/models";
 import { buildRosterCalendarViewModel } from "@/features/roster/selectors/rosterCalendarSelectors";
 
 const EXAMPLE_DOCTORS: ReadonlyArray<Doctor> = [
@@ -45,6 +49,7 @@ const EXAMPLE_SNAPSHOT: RosterSnapshot = {
       endDate: "2026-04-30"
     },
     status: "LOCKED",
+    isDeleted: false,
     createdAt: "2026-04-01T00:00:00.000Z",
     createdByUserId: "user-admin-demo",
     generatedAt: "2026-04-01T00:00:00.000Z",
@@ -81,6 +86,7 @@ const EXAMPLE_SNAPSHOT: RosterSnapshot = {
       rosterId: "roster-example",
       date: "2026-04-10",
       shiftTypeId: "shift-type-day",
+      locationId: DEFAULT_DUTY_LOCATION_ID,
       startTime: "08:00",
       endTime: "20:00",
       type: "DAY",
@@ -89,6 +95,7 @@ const EXAMPLE_SNAPSHOT: RosterSnapshot = {
       groupEligibility: "ALL",
       definitionSnapshot: {
         shiftTypeId: "shift-type-day",
+        locationId: DEFAULT_DUTY_LOCATION_ID,
         code: "DAY",
         label: "Day",
         startTime: "08:00",
@@ -101,6 +108,7 @@ const EXAMPLE_SNAPSHOT: RosterSnapshot = {
       rosterId: "roster-example",
       date: "2026-04-10",
       shiftTypeId: "shift-type-night",
+      locationId: DEFAULT_DUTY_LOCATION_ID,
       startTime: "20:00",
       endTime: "08:00",
       type: "NIGHT",
@@ -109,6 +117,7 @@ const EXAMPLE_SNAPSHOT: RosterSnapshot = {
       groupEligibility: "ALL",
       definitionSnapshot: {
         shiftTypeId: "shift-type-night",
+        locationId: DEFAULT_DUTY_LOCATION_ID,
         code: "NIGHT",
         label: "Night",
         startTime: "20:00",
@@ -121,6 +130,7 @@ const EXAMPLE_SNAPSHOT: RosterSnapshot = {
       rosterId: "roster-example",
       date: "2026-04-11",
       shiftTypeId: "shift-type-day",
+      locationId: DEFAULT_DUTY_LOCATION_ID,
       startTime: "08:00",
       endTime: "20:00",
       type: "DAY",
@@ -129,6 +139,7 @@ const EXAMPLE_SNAPSHOT: RosterSnapshot = {
       groupEligibility: "NOT_WEEKEND_OFF_GROUP",
       definitionSnapshot: {
         shiftTypeId: "shift-type-day",
+        locationId: DEFAULT_DUTY_LOCATION_ID,
         code: "DAY",
         label: "Day",
         startTime: "08:00",
@@ -179,7 +190,9 @@ const EXAMPLE_SNAPSHOT: RosterSnapshot = {
     offRequestCount: 0,
     shiftTypeCount: 2,
     firstWeekendOffGroup: "A",
-    weekendGroupSchedule: []
+    weekendGroupSchedule: [],
+    activeBiasCriteria: [],
+    activeDutyLocations: []
   }
 };
 

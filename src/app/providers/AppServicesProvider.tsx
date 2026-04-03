@@ -1,14 +1,18 @@
 import { createContext, useContext, useState } from "react";
 import {
   ROSTER_SEED_AUDIT_LOGS,
+  ROSTER_SEED_BIAS_CRITERIA,
   ROSTER_SEED_BIAS_LEDGERS,
   ROSTER_SEED_DOCTORS,
+  ROSTER_SEED_DUTY_LOCATIONS,
   ROSTER_SEED_LEAVES,
   ROSTER_SEED_OFF_REQUESTS,
   ROSTER_SEED_ROSTER_SNAPSHOTS,
   ROSTER_SEED_SHIFT_TYPES,
   ROSTER_SEED_WEEKDAY_PAIR_BIAS_LEDGERS
 } from "@/app/seed/rosterSeedData";
+import { createBiasCriteriaManagementService } from "@/features/admin/services/biasCriteriaManagementService";
+import { createDutyLocationManagementService } from "@/features/admin/services/dutyLocationManagementService";
 import { createAuditLogService } from "@/features/audit/services/auditLogService";
 import { createDoctorManagementService } from "@/features/doctors/services/doctorManagementService";
 import { createBiasManagementService } from "@/features/fairness/services/biasManagementService";
@@ -22,8 +26,10 @@ import {
 } from "@/infrastructure/repositories/inMemory";
 import {
   LocalStorageAuditLogRepository,
+  LocalStorageBiasCriteriaRepository,
   LocalStorageBiasLedgerRepository,
   LocalStorageDoctorRepository,
+  LocalStorageDutyLocationRepository,
   LocalStorageOffRequestRepository,
   LocalStorageRosterSnapshotRepository,
   LocalStorageWeekdayPairBiasLedgerRepository
@@ -32,78 +38,112 @@ import {
 export interface AppServices {
   readonly auditLogService: ReturnType<typeof createAuditLogService>;
   readonly biasManagementService: ReturnType<typeof createBiasManagementService>;
+  readonly biasCriteriaManagementService: ReturnType<
+    typeof createBiasCriteriaManagementService
+  >;
   readonly doctorManagementService: ReturnType<typeof createDoctorManagementService>;
+  readonly dutyLocationManagementService: ReturnType<
+    typeof createDutyLocationManagementService
+  >;
   readonly leaveManagementService: ReturnType<typeof createLeaveManagementService>;
   readonly offRequestService: ReturnType<typeof createOffRequestService>;
   readonly rosterWorkflowService: ReturnType<typeof createRosterWorkflowService>;
   readonly shiftTypeManagementService: ReturnType<typeof createShiftTypeManagementService>;
 }
 
-function createAppServices(): AppServices {
-  const doctorRepository = new LocalStorageDoctorRepository({
-    seedData: ROSTER_SEED_DOCTORS
-  });
-  const leaveRepository = new InMemoryLeaveRepository(ROSTER_SEED_LEAVES);
-  const shiftTypeRepository = new InMemoryShiftTypeRepository(ROSTER_SEED_SHIFT_TYPES);
-  const rosterSnapshotRepository = new LocalStorageRosterSnapshotRepository({
-    seedData: ROSTER_SEED_ROSTER_SNAPSHOTS
-  });
-  const auditLogRepository = new LocalStorageAuditLogRepository({
-    seedData: ROSTER_SEED_AUDIT_LOGS
-  });
-  const offRequestRepository = new LocalStorageOffRequestRepository({
-    seedData: ROSTER_SEED_OFF_REQUESTS
-  });
-  const biasLedgerRepository = new LocalStorageBiasLedgerRepository({
-    seedData: ROSTER_SEED_BIAS_LEDGERS
-  });
-  const weekdayPairBiasLedgerRepository =
-    new LocalStorageWeekdayPairBiasLedgerRepository({
+function createAppRepositories() {
+  return {
+    doctorRepository: new LocalStorageDoctorRepository({
+      seedData: ROSTER_SEED_DOCTORS
+    }),
+    dutyLocationRepository: new LocalStorageDutyLocationRepository({
+      seedData: ROSTER_SEED_DUTY_LOCATIONS
+    }),
+    biasCriteriaRepository: new LocalStorageBiasCriteriaRepository({
+      seedData: ROSTER_SEED_BIAS_CRITERIA
+    }),
+    leaveRepository: new InMemoryLeaveRepository(ROSTER_SEED_LEAVES),
+    shiftTypeRepository: new InMemoryShiftTypeRepository(ROSTER_SEED_SHIFT_TYPES),
+    rosterSnapshotRepository: new LocalStorageRosterSnapshotRepository({
+      seedData: ROSTER_SEED_ROSTER_SNAPSHOTS
+    }),
+    auditLogRepository: new LocalStorageAuditLogRepository({
+      seedData: ROSTER_SEED_AUDIT_LOGS
+    }),
+    offRequestRepository: new LocalStorageOffRequestRepository({
+      seedData: ROSTER_SEED_OFF_REQUESTS
+    }),
+    biasLedgerRepository: new LocalStorageBiasLedgerRepository({
+      seedData: ROSTER_SEED_BIAS_LEDGERS
+    }),
+    weekdayPairBiasLedgerRepository: new LocalStorageWeekdayPairBiasLedgerRepository({
       seedData: ROSTER_SEED_WEEKDAY_PAIR_BIAS_LEDGERS
-    });
+    })
+  };
+}
+
+function createAppServices(): AppServices {
+  const repositories = createAppRepositories();
   const auditLogService = createAuditLogService({
-    auditLogRepository
+    auditLogRepository: repositories.auditLogRepository
   });
 
+  const dutyLocationManagementService = createDutyLocationManagementService({
+    dutyLocationRepository: repositories.dutyLocationRepository,
+    biasCriteriaRepository: repositories.biasCriteriaRepository,
+    rosterSnapshotRepository: repositories.rosterSnapshotRepository,
+    auditLogService
+  });
+  const biasCriteriaManagementService = createBiasCriteriaManagementService({
+    biasCriteriaRepository: repositories.biasCriteriaRepository,
+    biasLedgerRepository: repositories.biasLedgerRepository,
+    rosterSnapshotRepository: repositories.rosterSnapshotRepository,
+    auditLogService
+  });
   const doctorManagementService = createDoctorManagementService({
-    doctorRepository,
-    leaveRepository,
-    offRequestRepository,
-    biasLedgerRepository,
-    weekdayPairBiasLedgerRepository,
-    rosterSnapshotRepository,
+    doctorRepository: repositories.doctorRepository,
+    leaveRepository: repositories.leaveRepository,
+    offRequestRepository: repositories.offRequestRepository,
+    biasLedgerRepository: repositories.biasLedgerRepository,
+    weekdayPairBiasLedgerRepository: repositories.weekdayPairBiasLedgerRepository,
+    rosterSnapshotRepository: repositories.rosterSnapshotRepository,
     auditLogService
   });
   const leaveManagementService = createLeaveManagementService({
-    leaveRepository
+    leaveRepository: repositories.leaveRepository
   });
   const shiftTypeManagementService = createShiftTypeManagementService({
-    shiftTypeRepository
+    shiftTypeRepository: repositories.shiftTypeRepository
   });
   const offRequestService = createOffRequestService({
-    offRequestRepository,
-    rosterSnapshotRepository
+    offRequestRepository: repositories.offRequestRepository,
+    rosterSnapshotRepository: repositories.rosterSnapshotRepository
   });
   const biasManagementService = createBiasManagementService({
-    biasLedgerRepository,
-    weekdayPairBiasLedgerRepository
+    biasCriteriaRepository: repositories.biasCriteriaRepository,
+    biasLedgerRepository: repositories.biasLedgerRepository,
+    weekdayPairBiasLedgerRepository: repositories.weekdayPairBiasLedgerRepository
   });
   const rosterWorkflowService = createRosterWorkflowService({
+    biasCriteriaManagementService,
     doctorManagementService,
+    dutyLocationManagementService,
     leaveManagementService,
     shiftTypeManagementService,
     offRequestService,
     biasManagementService,
-    biasLedgerRepository,
-    weekdayPairBiasLedgerRepository,
-    rosterSnapshotRepository,
+    biasLedgerRepository: repositories.biasLedgerRepository,
+    weekdayPairBiasLedgerRepository: repositories.weekdayPairBiasLedgerRepository,
+    rosterSnapshotRepository: repositories.rosterSnapshotRepository,
     auditLogService
   });
 
   return {
     auditLogService,
     biasManagementService,
+    biasCriteriaManagementService,
     doctorManagementService,
+    dutyLocationManagementService,
     leaveManagementService,
     offRequestService,
     rosterWorkflowService,

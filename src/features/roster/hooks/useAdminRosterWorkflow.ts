@@ -6,9 +6,17 @@ import type {
 } from "@/domain/models";
 import { useAppServices } from "@/app/providers/useAppServices";
 import { useAuth } from "@/features/auth/context/AuthContext";
+import { getAdminOperationErrorMessage } from "@/features/admin/services/adminOperationErrorMessage";
 import type { RosterMonthContext } from "@/features/roster/services/rosterWorkflowService";
 
 type WorkflowAction = "generate" | "publish" | "lock" | null;
+type ExtendedWorkflowAction =
+  | "generate"
+  | "publish"
+  | "lock"
+  | "unlock"
+  | "delete"
+  | null;
 type SnapshotViewMode = "draft" | "official";
 
 function getCurrentRosterMonth(): YearMonthString {
@@ -27,12 +35,14 @@ export function useAdminRosterWorkflow() {
   const [monthContext, setMonthContext] = useState<RosterMonthContext | null>(null);
   const [viewMode, setViewMode] = useState<SnapshotViewMode>("draft");
   const [isLoading, setIsLoading] = useState(true);
-  const [activeAction, setActiveAction] = useState<WorkflowAction>(null);
+  const [activeAction, setActiveAction] = useState<ExtendedWorkflowAction>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   async function loadContext() {
     setIsLoading(true);
     setErrorMessage(null);
+    setSuccessMessage(null);
 
     try {
       const nextContext = await rosterWorkflowService.getMonthContext({
@@ -48,8 +58,13 @@ export function useAdminRosterWorkflow() {
       if (viewMode === "official" && !nextContext.activeOfficial && nextContext.latestDraft) {
         setViewMode("draft");
       }
+
+      return nextContext;
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Unable to load roster data.");
+      setErrorMessage(
+        getAdminOperationErrorMessage(error, "Unable to load roster data.")
+      );
+      return null;
     } finally {
       setIsLoading(false);
     }
@@ -60,21 +75,52 @@ export function useAdminRosterWorkflow() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedMonth, firstWeekendOffGroup, rosterWorkflowService]);
 
-  async function runAction(
-    action: Exclude<WorkflowAction, null>,
-    work: () => Promise<RosterSnapshot>
+  async function runSnapshotAction(
+    action: Exclude<ExtendedWorkflowAction, null>,
+    work: () => Promise<RosterSnapshot>,
+    successMessageText?: string
   ) {
     setActiveAction(action);
     setErrorMessage(null);
+    setSuccessMessage(null);
 
     try {
       const snapshot = await work();
       await loadContext();
       setViewMode(snapshot.roster.status === "DRAFT" ? "draft" : "official");
+      if (successMessageText) {
+        setSuccessMessage(successMessageText);
+      }
       return snapshot;
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Roster action failed.");
+      setErrorMessage(
+        getAdminOperationErrorMessage(error, "Roster action failed.")
+      );
       return null;
+    } finally {
+      setActiveAction(null);
+    }
+  }
+
+  async function runVoidAction(
+    action: Exclude<ExtendedWorkflowAction, null>,
+    work: () => Promise<void>,
+    successMessageText: string
+  ) {
+    setActiveAction(action);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    try {
+      await work();
+      await loadContext();
+      setSuccessMessage(successMessageText);
+      return true;
+    } catch (error) {
+      setErrorMessage(
+        getAdminOperationErrorMessage(error, "Roster action failed.")
+      );
+      return false;
     } finally {
       setActiveAction(null);
     }
@@ -85,7 +131,7 @@ export function useAdminRosterWorkflow() {
       return null;
     }
 
-    return runAction("generate", () =>
+    return runSnapshotAction("generate", () =>
       rosterWorkflowService.generateDraft({
         rosterMonth: selectedMonth,
         firstWeekendOffGroup,
@@ -101,7 +147,7 @@ export function useAdminRosterWorkflow() {
       return null;
     }
 
-    return runAction("publish", () =>
+    return runSnapshotAction("publish", () =>
       rosterWorkflowService.publishDraft({
         draftRosterId: monthContext.latestDraft!.roster.id,
         actorId: user.id,
@@ -115,12 +161,46 @@ export function useAdminRosterWorkflow() {
       return null;
     }
 
-    return runAction("lock", () =>
+    return runSnapshotAction("lock", () =>
       rosterWorkflowService.lockPublishedRoster({
         publishedRosterId: monthContext.activeOfficial!.roster.id,
         actorId: user.id,
         actorRole: role
       })
+    );
+  }
+
+  async function unlockLockedRoster() {
+    if (!user || !role || monthContext?.activeOfficial?.roster.status !== "LOCKED") {
+      return null;
+    }
+
+    return runSnapshotAction(
+      "unlock",
+      () =>
+        rosterWorkflowService.unlockLockedRoster({
+          lockedRosterId: monthContext.activeOfficial!.roster.id,
+          actorId: user.id,
+          actorRole: role
+        }),
+      "Roster unlocked and reopened as published."
+    );
+  }
+
+  async function deleteRoster() {
+    if (!user || !role || !displaySnapshot) {
+      return false;
+    }
+
+    return runVoidAction(
+      "delete",
+      () =>
+        rosterWorkflowService.deleteRoster({
+          rosterId: displaySnapshot.roster.id,
+          actorId: user.id,
+          actorRole: role
+        }),
+      "Roster deleted."
     );
   }
 
@@ -143,8 +223,12 @@ export function useAdminRosterWorkflow() {
     isLoading,
     activeAction,
     errorMessage,
+    successMessage,
+    reloadContext: loadContext,
     generateDraft,
     publishDraft,
-    lockPublishedRoster
+    lockPublishedRoster,
+    unlockLockedRoster,
+    deleteRoster
   };
 }

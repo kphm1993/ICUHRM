@@ -1,34 +1,26 @@
 import type {
   Assignment,
   BiasLedger,
+  BiasCriteria,
   Doctor,
+  DutyLocation,
   EntityId,
   Shift,
-  WeekdayPairBiasLedger,
+  ShiftType,
   YearMonthString
 } from "@/domain/models";
 import {
-  createEmptyBiasBalance,
-  createEmptyWeekdayPairBiasBalance,
-  readBiasBucketValue,
-  readWeekdayPairBiasBucketValue,
-  roundBiasValue,
-  writeBiasBucketValue,
-  writeWeekdayPairBiasBucketValue
+  createEmptyBiasLedgerBalances,
+  roundBiasValue
 } from "@/domain/scheduling/biasBuckets";
 import { DEFAULT_SCHEDULING_ENGINE_CONFIG } from "@/domain/scheduling/config";
-import type {
-  BiasBucket,
-  GenerateRosterInput,
-  GenerateRosterOutput
-} from "@/domain/scheduling/contracts";
+import type { GenerateRosterInput, GenerateRosterOutput } from "@/domain/scheduling/contracts";
 import { checkShiftEligibility } from "@/domain/scheduling/checkEligibility";
+import { determineBiasCriteriaForShift } from "@/domain/scheduling/determineBiasCriteria";
 import { compareShiftsForAssignment } from "@/domain/scheduling/shiftClassification";
 import {
   computeAvailabilityAwareFairShare,
-  computeAvailabilityAwareWeekdayPairFairShare,
-  countGeneratedShiftsByBucket,
-  countGeneratedShiftsByWeekdayPair,
+  countGeneratedShiftsByCriteria,
   initializeFairnessWorkingState,
   recordAssignmentForShift,
   recordEligibilityForShift
@@ -36,14 +28,17 @@ import {
 import { generateShiftPool } from "@/domain/scheduling/generateShiftPool";
 import { scoreCandidates } from "@/domain/scheduling/scoreCandidates";
 import { validateGeneratedRoster } from "@/domain/scheduling/validateRoster";
+import { NoCriteriaDefinedError } from "@/domain/repositories";
 
 function toYearMonthString(date: string): YearMonthString {
   return date.slice(0, 7) as YearMonthString;
 }
 
-function indexDoctorsById(doctors: ReadonlyArray<Doctor>): Readonly<Record<EntityId, Doctor>> {
-  return doctors.reduce<Record<EntityId, Doctor>>((result, doctor) => {
-    result[doctor.id] = doctor;
+function indexEntriesById<T extends { readonly id: EntityId }>(
+  entries: ReadonlyArray<T>
+): Readonly<Record<EntityId, T>> {
+  return entries.reduce<Record<EntityId, T>>((result, entry) => {
+    result[entry.id] = entry;
     return result;
   }, {});
 }
@@ -69,46 +64,91 @@ function findExistingBiasLedger(
   return ledgers.find((entry) => entry.doctorId === doctorId) ?? null;
 }
 
-function findExistingWeekdayPairBiasLedger(
-  ledgers: ReadonlyArray<WeekdayPairBiasLedger>,
-  doctorId: EntityId
-): WeekdayPairBiasLedger | null {
-  return ledgers.find((entry) => entry.doctorId === doctorId) ?? null;
+function assertCriteriaConfigurationIsValid(input: GenerateRosterInput): void {
+  if (input.activeBiasCriteria.length === 0) {
+    throw new NoCriteriaDefinedError(
+      "No active bias criteria defined. Create at least one criteria before generating a roster."
+    );
+  }
+
+  if (input.activeDutyLocations.length !== 1) {
+    throw new Error(
+      "Phase 3 roster generation requires exactly one active duty location."
+    );
+  }
+
+  const activeLocationIds = new Set(
+    input.activeDutyLocations
+      .filter((location) => location.isActive)
+      .map((location) => location.id)
+  );
+  const activeShiftTypeIds = new Set(
+    input.shiftTypes.filter((shiftType) => shiftType.isActive).map((shiftType) => shiftType.id)
+  );
+
+  if (!activeLocationIds.has(input.generationLocationId)) {
+    throw new Error(
+      `Generation location '${input.generationLocationId}' is not an active duty location.`
+    );
+  }
+
+  for (const criteria of input.activeBiasCriteria) {
+    if (!criteria.isActive) {
+      throw new Error(
+        `Bias criteria '${criteria.code}' must be active before it can be used in roster generation.`
+      );
+    }
+
+    for (const locationId of criteria.locationIds) {
+      if (!activeLocationIds.has(locationId)) {
+        throw new Error(
+          `Bias criteria '${criteria.code}' references duty location '${locationId}', which is missing or inactive for generation.`
+        );
+      }
+    }
+
+    for (const shiftTypeId of criteria.shiftTypeIds) {
+      if (!activeShiftTypeIds.has(shiftTypeId)) {
+        throw new Error(
+          `Bias criteria '${criteria.code}' references shift type '${shiftTypeId}', which is missing or inactive for generation.`
+        );
+      }
+    }
+  }
 }
 
 function computeUpdatedBiasLedger(
   input: GenerateRosterInput,
-  shifts: ReadonlyArray<Shift>,
+  criteriaIdsByShiftId: ReadonlyMap<EntityId, ReadonlyArray<EntityId>>,
   fairnessState: ReturnType<typeof initializeFairnessWorkingState>,
   timestamp: string
 ): ReadonlyArray<BiasLedger> {
-  const totalShiftCounts = countGeneratedShiftsByBucket(shifts);
+  const totalShiftCounts = countGeneratedShiftsByCriteria(criteriaIdsByShiftId);
   const effectiveMonth = toYearMonthString(input.range.startDate);
 
   return input.doctors.map((doctor) => {
     const existingLedger = findExistingBiasLedger(input.currentBias, doctor.id);
-    let nextBalance = existingLedger?.balance ?? createEmptyBiasBalance();
+    const nextBalance: Record<EntityId, number> = createEmptyBiasLedgerBalances();
 
-    for (const bucket of Object.keys(totalShiftCounts) as BiasBucket[]) {
+    for (const criteria of input.activeBiasCriteria) {
       const assignedCount =
-        fairnessState.doctorSnapshots[doctor.id]?.assignedByBucket[bucket] ?? 0;
+        fairnessState.doctorSnapshots[doctor.id]?.assignedByCriteria[criteria.id] ?? 0;
       const fairShare = computeAvailabilityAwareFairShare(
         fairnessState,
         doctor.id,
-        bucket,
-        totalShiftCounts[bucket]
+        criteria.id,
+        totalShiftCounts[criteria.id] ?? 0
       );
-      const existingValue = readBiasBucketValue(nextBalance, bucket);
+      const existingValue = existingLedger?.balances[criteria.id] ?? 0;
       const nextValue = roundBiasValue(existingValue + assignedCount - fairShare);
-
-      nextBalance = writeBiasBucketValue(nextBalance, bucket, nextValue);
+      nextBalance[criteria.id] = nextValue;
     }
 
     return {
       id: existingLedger?.id ?? crypto.randomUUID(),
       doctorId: doctor.id,
       effectiveMonth,
-      balance: nextBalance,
+      balances: nextBalance,
       source: "ROSTER_GENERATION" as const,
       sourceReferenceId: input.rosterId,
       updatedAt: timestamp,
@@ -117,74 +157,59 @@ function computeUpdatedBiasLedger(
   });
 }
 
-function computeUpdatedWeekdayPairBiasLedger(
-  input: GenerateRosterInput,
-  shifts: ReadonlyArray<Shift>,
-  fairnessState: ReturnType<typeof initializeFairnessWorkingState>,
-  timestamp: string
-): ReadonlyArray<WeekdayPairBiasLedger> {
-  const totalShiftCounts = countGeneratedShiftsByWeekdayPair(shifts);
-  const effectiveMonth = toYearMonthString(input.range.startDate);
+function warnForUnmatchedCriteriaCoverage(input: {
+  readonly shifts: ReadonlyArray<Shift>;
+  readonly criteriaIdsByShiftId: ReadonlyMap<EntityId, ReadonlyArray<EntityId>>;
+  readonly warnings: Set<string>;
+}): void {
+  let matchedShiftCount = 0;
 
-  return input.doctors.map((doctor) => {
-    const existingLedger = findExistingWeekdayPairBiasLedger(
-      input.currentWeekdayPairBias,
-      doctor.id
-    );
-    let nextBalance =
-      existingLedger?.balance ?? createEmptyWeekdayPairBiasBalance();
+  for (const shift of input.shifts) {
+    const matchedCriteriaIds = input.criteriaIdsByShiftId.get(shift.id) ?? [];
 
-    for (const bucket of Object.keys(totalShiftCounts)) {
-      const pairBucket = bucket as keyof typeof totalShiftCounts;
-      const assignedCount =
-        fairnessState.doctorSnapshots[doctor.id]?.assignedByWeekdayPair[pairBucket] ??
-        0;
-      const fairShare = computeAvailabilityAwareWeekdayPairFairShare(
-        fairnessState,
-        doctor.id,
-        pairBucket,
-        totalShiftCounts[pairBucket]
+    if (matchedCriteriaIds.length === 0) {
+      input.warnings.add(
+        `No active bias criteria matched shift ${shift.id}; scoring used only off-request and overall assignment load.`
       );
-      const existingValue = readWeekdayPairBiasBucketValue(nextBalance, pairBucket);
-      const nextValue = roundBiasValue(existingValue + assignedCount - fairShare);
-
-      nextBalance = writeWeekdayPairBiasBucketValue(
-        nextBalance,
-        pairBucket,
-        nextValue
-      );
+      continue;
     }
 
-    return {
-      id: existingLedger?.id ?? crypto.randomUUID(),
-      doctorId: doctor.id,
-      effectiveMonth,
-      balance: nextBalance,
-      source: "ROSTER_GENERATION" as const,
-      sourceReferenceId: input.rosterId,
-      updatedAt: timestamp,
-      updatedByActorId: input.generatedByActorId
-    };
-  });
+    matchedShiftCount += 1;
+  }
+
+  if (matchedShiftCount === 0 && input.shifts.length > 0) {
+    input.warnings.add(
+      "No generated shifts matched any active bias criteria in this roster month."
+    );
+  }
 }
 
 export function generateRoster(
   input: GenerateRosterInput
 ): GenerateRosterOutput {
+  assertCriteriaConfigurationIsValid(input);
+
   const config = input.config ?? DEFAULT_SCHEDULING_ENGINE_CONFIG;
   const warnings = new Set<string>();
   const generatedAt = new Date().toISOString();
   const assignments: Assignment[] = [];
-  const doctorsById = indexDoctorsById(input.doctors);
-  let fairnessState = initializeFairnessWorkingState(input.doctors);
+  const doctorsById = indexEntriesById(input.doctors);
+  const shiftTypesById = indexEntriesById(input.shiftTypes);
+  const dutyLocationsById = indexEntriesById(input.activeDutyLocations);
+  let fairnessState = initializeFairnessWorkingState({
+    doctors: input.doctors,
+    criteriaIds: input.activeBiasCriteria.map((criteria) => criteria.id)
+  });
 
   const shifts = [...generateShiftPool({
     rosterId: input.rosterId,
     range: input.range,
     shiftTypes: input.shiftTypes,
+    generationLocationId: input.generationLocationId,
     weekendGroupSchedule: input.weekendGroupSchedule
   })].sort(compareShiftsForAssignment);
   const shiftsById = new Map(shifts.map((shift) => [shift.id, shift] as const));
+  const criteriaIdsByShiftId = new Map<EntityId, ReadonlyArray<EntityId>>();
 
   if (toYearMonthString(input.range.startDate) !== toYearMonthString(input.range.endDate)) {
     warnings.add(
@@ -199,15 +224,44 @@ export function generateRoster(
       leaves: input.leaves,
       currentAssignments: assignments,
       shiftsById,
-      weekendGroupSchedule: input.weekendGroupSchedule
+        weekendGroupSchedule: input.weekendGroupSchedule
     });
-    fairnessState = recordEligibilityForShift(fairnessState, shift, eligibility);
+    const shiftType = shiftTypesById[shift.shiftTypeId] as ShiftType | undefined;
+    const location = dutyLocationsById[shift.locationId] as DutyLocation | undefined;
+
+    if (!shiftType) {
+      warnings.add(
+        `Shift ${shift.id} references shift type ${shift.shiftTypeId}, which is missing from generation input.`
+      );
+      continue;
+    }
+
+    if (!location) {
+      warnings.add(
+        `Shift ${shift.id} references duty location ${shift.locationId}, which is missing from generation input.`
+      );
+      continue;
+    }
+
+    const matchingCriteria = determineBiasCriteriaForShift({
+      shift,
+      shiftType,
+      location,
+      activeCriteria: input.activeBiasCriteria
+    });
+    const matchingCriteriaIds = matchingCriteria.map((criteria) => criteria.id);
+    criteriaIdsByShiftId.set(shift.id, matchingCriteriaIds);
+    fairnessState = recordEligibilityForShift(
+      fairnessState,
+      eligibility,
+      matchingCriteriaIds
+    );
 
     const candidateScores = scoreCandidates({
       shift,
       eligibility,
       currentBias: input.currentBias,
-      currentWeekdayPairBias: input.currentWeekdayPairBias,
+      matchingCriteria,
       offRequests: input.offRequests,
       fairnessState,
       config
@@ -229,13 +283,22 @@ export function generateRoster(
     }
 
     assignments.push(createAssignment(shift, selectedDoctor.id, generatedAt));
-    fairnessState = recordAssignmentForShift(fairnessState, shift, selectedDoctor.id);
+    fairnessState = recordAssignmentForShift(
+      fairnessState,
+      selectedDoctor.id,
+      matchingCriteriaIds
+    );
   }
 
-  const updatedBias = computeUpdatedBiasLedger(input, shifts, fairnessState, generatedAt);
-  const updatedWeekdayPairBias = computeUpdatedWeekdayPairBiasLedger(
-    input,
+  warnForUnmatchedCriteriaCoverage({
     shifts,
+    criteriaIdsByShiftId,
+    warnings
+  });
+
+  const updatedBias = computeUpdatedBiasLedger(
+    input,
+    criteriaIdsByShiftId,
     fairnessState,
     generatedAt
   );
@@ -245,6 +308,9 @@ export function generateRoster(
     leaves: input.leaves,
     shifts,
     assignments,
+    updatedBias,
+    activeBiasCriteria: input.activeBiasCriteria,
+    activeDutyLocations: input.activeDutyLocations,
     weekendGroupSchedule: input.weekendGroupSchedule
   });
 
@@ -252,7 +318,6 @@ export function generateRoster(
     shifts,
     assignments,
     updatedBias,
-    updatedWeekdayPairBias,
     validation,
     warnings: Array.from(warnings)
   };

@@ -15,8 +15,8 @@ export function FairnessDashboardPage() {
           Fairness Dashboard
         </h1>
         <p className="mt-3 max-w-3xl text-sm text-slate-600 sm:text-base">
-          Compare doctor totals, weekday and weekend bucket counts, and carry-forward
-          primary plus weekday-pair bias values for the selected month.
+          Compare doctor totals, weekday and weekend bucket counts, and the
+          carry-forward bias values that apply to the selected month.
         </p>
       </header>
 

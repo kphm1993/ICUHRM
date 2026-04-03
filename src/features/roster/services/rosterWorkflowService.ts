@@ -1,7 +1,9 @@
 import type {
   ActorRole,
+  BiasCriteria,
   BiasLedger,
   Doctor,
+  DutyLocation,
   EntityId,
   Leave,
   OffRequest,
@@ -19,8 +21,14 @@ import type {
   RosterSnapshotRepository,
   WeekdayPairBiasLedgerRepository
 } from "@/domain/repositories";
-import { RepositoryNotFoundError } from "@/domain/repositories";
+import {
+  RepositoryNotFoundError,
+  RosterDeletionError,
+  UnauthorizedError
+} from "@/domain/repositories";
 import { generateRoster } from "@/domain/scheduling";
+import type { BiasCriteriaManagementService } from "@/features/admin/services/biasCriteriaManagementService";
+import type { DutyLocationManagementService } from "@/features/admin/services/dutyLocationManagementService";
 import type { AuditLogService } from "@/features/audit/services/auditLogService";
 import type { DoctorManagementService } from "@/features/doctors/services/doctorManagementService";
 import type { BiasManagementService } from "@/features/fairness/services/biasManagementService";
@@ -43,6 +51,8 @@ export interface RosterMonthContext {
   readonly shiftTypes: ReadonlyArray<ShiftType>;
   readonly currentBias: ReadonlyArray<BiasLedger>;
   readonly currentWeekdayPairBias: ReadonlyArray<WeekdayPairBiasLedger>;
+  readonly activeBiasCriteria: ReadonlyArray<BiasCriteria>;
+  readonly activeDutyLocations: ReadonlyArray<DutyLocation>;
   readonly sourceSummary: RosterSnapshot["generatedInputSummary"];
   readonly snapshots: ReadonlyArray<RosterSnapshot>;
   readonly latestDraft: RosterSnapshot | null;
@@ -76,15 +86,31 @@ export interface LockPublishedRosterInput {
   readonly actorRole: ActorRole;
 }
 
+export interface UnlockLockedRosterInput {
+  readonly lockedRosterId: EntityId;
+  readonly actorId: EntityId;
+  readonly actorRole: ActorRole;
+}
+
+export interface DeleteRosterInput {
+  readonly rosterId: EntityId;
+  readonly actorId: EntityId;
+  readonly actorRole: ActorRole;
+}
+
 export interface RosterWorkflowService {
   getMonthContext(input: GetRosterMonthContextInput): Promise<RosterMonthContext>;
   generateDraft(input: GenerateDraftRosterInput): Promise<RosterSnapshot>;
   publishDraft(input: PublishDraftRosterInput): Promise<RosterSnapshot>;
   lockPublishedRoster(input: LockPublishedRosterInput): Promise<RosterSnapshot>;
+  unlockLockedRoster(input: UnlockLockedRosterInput): Promise<RosterSnapshot>;
+  deleteRoster(input: DeleteRosterInput): Promise<void>;
 }
 
 export interface RosterWorkflowServiceDependencies {
+  readonly biasCriteriaManagementService: BiasCriteriaManagementService;
   readonly doctorManagementService: DoctorManagementService;
+  readonly dutyLocationManagementService: DutyLocationManagementService;
   readonly leaveManagementService: LeaveManagementService;
   readonly shiftTypeManagementService: ShiftTypeManagementService;
   readonly offRequestService: OffRequestService;
@@ -112,6 +138,12 @@ function findLatestSnapshotByStatus(
   return snapshots.find((snapshot) => snapshot.roster.status === status) ?? null;
 }
 
+function filterDeletedSnapshots(
+  snapshots: ReadonlyArray<RosterSnapshot>
+): ReadonlyArray<RosterSnapshot> {
+  return snapshots.filter((snapshot) => !snapshot.roster.isDeleted);
+}
+
 function findActiveOfficialSnapshot(
   snapshots: ReadonlyArray<RosterSnapshot>
 ): RosterSnapshot | null {
@@ -130,6 +162,8 @@ function buildGeneratedInputSummary(input: {
   readonly leaves: ReadonlyArray<Leave>;
   readonly offRequests: ReadonlyArray<OffRequest>;
   readonly shiftTypes: ReadonlyArray<ShiftType>;
+  readonly activeBiasCriteria: ReadonlyArray<BiasCriteria>;
+  readonly activeDutyLocations: ReadonlyArray<DutyLocation>;
 }): RosterSnapshot["generatedInputSummary"] {
   return {
     rosterMonth: input.rosterMonth,
@@ -139,7 +173,16 @@ function buildGeneratedInputSummary(input: {
     offRequestCount: input.offRequests.length,
     shiftTypeCount: input.shiftTypes.length,
     firstWeekendOffGroup: input.firstWeekendOffGroup,
-    weekendGroupSchedule: input.weekendGroupSchedule
+    weekendGroupSchedule: input.weekendGroupSchedule,
+    activeBiasCriteria: input.activeBiasCriteria.map((criteria) => ({
+      ...criteria,
+      locationIds: [...criteria.locationIds],
+      shiftTypeIds: [...criteria.shiftTypeIds],
+      weekdayConditions: [...criteria.weekdayConditions]
+    })),
+    activeDutyLocations: input.activeDutyLocations.map((location) => ({
+      ...location
+    }))
   };
 }
 
@@ -220,7 +263,7 @@ function createLifecycleSnapshot(
     },
     updatedBias: sourceSnapshot.updatedBias.map((entry) => ({
       ...entry,
-      balance: { ...entry.balance },
+      balances: { ...entry.balances },
       sourceReferenceId: nextRosterId
     })),
     updatedWeekdayPairBias: sourceSnapshot.updatedWeekdayPairBias?.map((entry) => ({
@@ -234,6 +277,19 @@ function createLifecycleSnapshot(
       range: { ...sourceSnapshot.generatedInputSummary.range },
       weekendGroupSchedule: sourceSnapshot.generatedInputSummary.weekendGroupSchedule.map(
         (entry) => ({ ...entry })
+      ),
+      activeBiasCriteria: sourceSnapshot.generatedInputSummary.activeBiasCriteria.map(
+        (criteria) => ({
+          ...criteria,
+          locationIds: [...criteria.locationIds],
+          shiftTypeIds: [...criteria.shiftTypeIds],
+          weekdayConditions: [...criteria.weekdayConditions]
+        })
+      ),
+      activeDutyLocations: sourceSnapshot.generatedInputSummary.activeDutyLocations.map(
+        (location) => ({
+          ...location
+        })
       )
     }
   };
@@ -251,6 +307,12 @@ async function loadSourceData(
   );
   const doctors = await dependencies.doctorManagementService.listDoctors();
   const activeDoctors = doctors.filter((doctor) => doctor.isActive);
+  const dutyLocations =
+    await dependencies.dutyLocationManagementService.getLocationList();
+  const activeDutyLocations = dutyLocations.filter((location) => location.isActive);
+  const biasCriteria =
+    await dependencies.biasCriteriaManagementService.getCriteriaList();
+  const activeBiasCriteria = biasCriteria.filter((criteria) => criteria.isActive);
   const leaves = await dependencies.leaveManagementService.listLeaves(
     range.startDate,
     range.endDate
@@ -272,7 +334,9 @@ async function loadSourceData(
     offRequests,
     shiftTypes,
     currentBias,
-    currentWeekdayPairBias
+    currentWeekdayPairBias,
+    activeBiasCriteria,
+    activeDutyLocations
   };
 }
 
@@ -281,11 +345,37 @@ async function appendRosterAuditLog(
   input: {
     readonly actorId: EntityId;
     readonly actorRole: ActorRole;
-    readonly actionType: "ROSTER_GENERATED" | "ROSTER_PUBLISHED" | "ROSTER_LOCKED";
+    readonly actionType:
+      | "ROSTER_GENERATED"
+      | "ROSTER_PUBLISHED"
+      | "ROSTER_LOCKED"
+      | "ROSTER_UNLOCKED"
+      | "ROSTER_DELETED"
+      | "ROSTER_DELETE_BLOCKED";
     readonly snapshot: RosterSnapshot;
     readonly firstWeekendOffGroup: WeekendGroup;
+    readonly extraDetails?: Readonly<Record<string, unknown>>;
   }
 ): Promise<void> {
+  const activeBiasCriteria =
+    input.snapshot.generatedInputSummary.activeBiasCriteria.map((criteria) => ({
+      id: criteria.id,
+      code: criteria.code,
+      label: criteria.label,
+      locationIds: [...criteria.locationIds],
+      shiftTypeIds: [...criteria.shiftTypeIds],
+      weekdayConditions: [...criteria.weekdayConditions],
+      isWeekendOnly: criteria.isWeekendOnly,
+      isActive: criteria.isActive
+    }));
+  const activeDutyLocations =
+    input.snapshot.generatedInputSummary.activeDutyLocations.map((location) => ({
+      id: location.id,
+      code: location.code,
+      label: location.label,
+      isActive: location.isActive
+    }));
+
   await dependencies.auditLogService.appendLog({
     actorId: input.actorId,
     actorRole: input.actorRole,
@@ -298,9 +388,66 @@ async function appendRosterAuditLog(
       warningCount: input.snapshot.warnings.length,
       validationPassed: input.snapshot.validation.isValid,
       firstWeekendOffGroup: input.firstWeekendOffGroup,
-      derivedFromRosterId: input.snapshot.derivedFromRosterId ?? null
+      derivedFromRosterId: input.snapshot.derivedFromRosterId ?? null,
+      activeCriteriaCount: activeBiasCriteria.length,
+      activeBiasCriteria,
+      activeDutyLocationCount: activeDutyLocations.length,
+      activeDutyLocations,
+      generationLocationId:
+        activeDutyLocations.length === 1 ? activeDutyLocations[0].id : null,
+      ...input.extraDetails
     }
   });
+}
+
+function assertAdminActorRole(actorRole: ActorRole): void {
+  if (actorRole !== "ADMIN") {
+    throw new UnauthorizedError("You do not have permission to manage roster lifecycle.");
+  }
+}
+
+function ensureVisibleRosterSnapshot(
+  snapshot: RosterSnapshot | null,
+  rosterId: EntityId
+): RosterSnapshot {
+  if (!snapshot || snapshot.roster.isDeleted) {
+    throw new RepositoryNotFoundError(
+      `Roster '${rosterId}' was not found. It may already have been removed.`
+    );
+  }
+
+  return snapshot;
+}
+
+function createUnlockedSnapshot(snapshot: RosterSnapshot): RosterSnapshot {
+  const timestamp = new Date().toISOString();
+
+  return {
+    ...snapshot,
+    roster: {
+      ...snapshot.roster,
+      status: "PUBLISHED",
+      lockedAt: undefined,
+      publishedAt: snapshot.roster.publishedAt ?? timestamp
+    }
+  };
+}
+
+function createDeletedSnapshot(
+  snapshot: RosterSnapshot,
+  actorId: EntityId
+): RosterSnapshot {
+  const timestamp = new Date().toISOString();
+
+  return {
+    ...snapshot,
+    roster: {
+      ...snapshot.roster,
+      isDeleted: true,
+      deletedAt: timestamp,
+      deletedByActorId: actorId
+    }
+  };
 }
 
 export function createRosterWorkflowService(
@@ -314,9 +461,10 @@ export function createRosterWorkflowService(
         input.rosterMonth,
         firstWeekendOffGroup
       );
-      const snapshots = await dependencies.rosterSnapshotRepository.list({
+      const allSnapshots = await dependencies.rosterSnapshotRepository.list({
         rosterMonth: input.rosterMonth
       });
+      const snapshots = filterDeletedSnapshots(allSnapshots);
       const latestDraft = findLatestSnapshotByStatus(snapshots, "DRAFT");
       const latestPublished = findLatestSnapshotByStatus(snapshots, "PUBLISHED");
       const latestLocked = findLatestSnapshotByStatus(snapshots, "LOCKED");
@@ -332,6 +480,8 @@ export function createRosterWorkflowService(
         shiftTypes: sourceData.shiftTypes,
         currentBias: sourceData.currentBias,
         currentWeekdayPairBias: sourceData.currentWeekdayPairBias,
+        activeBiasCriteria: sourceData.activeBiasCriteria,
+        activeDutyLocations: sourceData.activeDutyLocations,
         sourceSummary: buildGeneratedInputSummary({
           rosterMonth: input.rosterMonth,
           range: sourceData.range,
@@ -340,7 +490,9 @@ export function createRosterWorkflowService(
           activeDoctors: sourceData.activeDoctors,
           leaves: sourceData.leaves,
           offRequests: sourceData.offRequests,
-          shiftTypes: sourceData.shiftTypes
+          shiftTypes: sourceData.shiftTypes,
+          activeBiasCriteria: sourceData.activeBiasCriteria,
+          activeDutyLocations: sourceData.activeDutyLocations
         }),
         snapshots,
         latestDraft,
@@ -367,6 +519,12 @@ export function createRosterWorkflowService(
         );
       }
 
+      if (monthContext.activeDutyLocations.length !== 1) {
+        throw new Error(
+          "Phase 3 roster generation requires exactly one active duty location."
+        );
+      }
+
       const timestamp = new Date().toISOString();
       const rosterId = crypto.randomUUID();
       const result = generateRoster({
@@ -377,7 +535,9 @@ export function createRosterWorkflowService(
         leaves: monthContext.leaves,
         offRequests: monthContext.offRequests,
         currentBias: monthContext.currentBias,
-        currentWeekdayPairBias: monthContext.currentWeekdayPairBias,
+        activeBiasCriteria: monthContext.activeBiasCriteria,
+        activeDutyLocations: monthContext.activeDutyLocations,
+        generationLocationId: monthContext.activeDutyLocations[0].id,
         weekendGroupSchedule: monthContext.weekendGroupSchedule,
         generatedByActorId: input.actorId
       });
@@ -387,6 +547,7 @@ export function createRosterWorkflowService(
           id: rosterId,
           period: monthContext.range,
           status: "DRAFT",
+          isDeleted: false,
           createdAt: timestamp,
           createdByUserId: input.actorId,
           generatedAt: timestamp,
@@ -399,7 +560,6 @@ export function createRosterWorkflowService(
         warnings: result.warnings,
         validation: result.validation,
         updatedBias: result.updatedBias,
-        updatedWeekdayPairBias: result.updatedWeekdayPairBias,
         generatedInputSummary: monthContext.sourceSummary
       };
 
@@ -417,10 +577,12 @@ export function createRosterWorkflowService(
       return savedSnapshot;
     },
     async publishDraft(input) {
-      const draftSnapshot =
-        await dependencies.rosterSnapshotRepository.findById(input.draftRosterId);
+      const draftSnapshot = ensureVisibleRosterSnapshot(
+        await dependencies.rosterSnapshotRepository.findById(input.draftRosterId),
+        input.draftRosterId
+      );
 
-      if (!draftSnapshot || draftSnapshot.roster.status !== "DRAFT") {
+      if (draftSnapshot.roster.status !== "DRAFT") {
         throw new RepositoryNotFoundError(
           `Draft roster '${input.draftRosterId}' was not found.`
         );
@@ -479,10 +641,12 @@ export function createRosterWorkflowService(
       return savedSnapshot;
     },
     async lockPublishedRoster(input) {
-      const publishedSnapshot =
-        await dependencies.rosterSnapshotRepository.findById(input.publishedRosterId);
+      const publishedSnapshot = ensureVisibleRosterSnapshot(
+        await dependencies.rosterSnapshotRepository.findById(input.publishedRosterId),
+        input.publishedRosterId
+      );
 
-      if (!publishedSnapshot || publishedSnapshot.roster.status !== "PUBLISHED") {
+      if (publishedSnapshot.roster.status !== "PUBLISHED") {
         throw new RepositoryNotFoundError(
           `Published roster '${input.publishedRosterId}' was not found.`
         );
@@ -518,6 +682,78 @@ export function createRosterWorkflowService(
       });
 
       return savedSnapshot;
+    },
+    async unlockLockedRoster(input) {
+      assertAdminActorRole(input.actorRole);
+
+      const snapshot = ensureVisibleRosterSnapshot(
+        await dependencies.rosterSnapshotRepository.findById(input.lockedRosterId),
+        input.lockedRosterId
+      );
+
+      if (snapshot.roster.status !== "LOCKED") {
+        throw new Error("Only locked rosters can be unlocked.");
+      }
+
+      const unlockedSnapshot = createUnlockedSnapshot(snapshot);
+      const savedSnapshot =
+        await dependencies.rosterSnapshotRepository.save(unlockedSnapshot);
+
+      await appendRosterAuditLog(dependencies, {
+        actorId: input.actorId,
+        actorRole: input.actorRole,
+        actionType: "ROSTER_UNLOCKED",
+        snapshot: savedSnapshot,
+        firstWeekendOffGroup:
+          savedSnapshot.generatedInputSummary.firstWeekendOffGroup,
+        extraDetails: {
+          previousStatus: "LOCKED",
+          nextStatus: "PUBLISHED",
+          unlockedAt: new Date().toISOString()
+        }
+      });
+
+      return savedSnapshot;
+    },
+    async deleteRoster(input) {
+      assertAdminActorRole(input.actorRole);
+
+      const snapshot = ensureVisibleRosterSnapshot(
+        await dependencies.rosterSnapshotRepository.findById(input.rosterId),
+        input.rosterId
+      );
+
+      if (snapshot.roster.status === "LOCKED") {
+        await appendRosterAuditLog(dependencies, {
+          actorId: input.actorId,
+          actorRole: input.actorRole,
+          actionType: "ROSTER_DELETE_BLOCKED",
+          snapshot,
+          firstWeekendOffGroup: snapshot.generatedInputSummary.firstWeekendOffGroup,
+          extraDetails: {
+            blockedReason: "Cannot delete a locked roster. Unlock it first."
+          }
+        });
+
+        throw new RosterDeletionError("Cannot delete a locked roster. Unlock it first.");
+      }
+
+      const deletedSnapshot = createDeletedSnapshot(snapshot, input.actorId);
+      const savedSnapshot =
+        await dependencies.rosterSnapshotRepository.save(deletedSnapshot);
+
+      await appendRosterAuditLog(dependencies, {
+        actorId: input.actorId,
+        actorRole: input.actorRole,
+        actionType: "ROSTER_DELETED",
+        snapshot: savedSnapshot,
+        firstWeekendOffGroup:
+          savedSnapshot.generatedInputSummary.firstWeekendOffGroup,
+        extraDetails: {
+          previousStatus: snapshot.roster.status,
+          deletedAt: savedSnapshot.roster.deletedAt ?? null
+        }
+      });
     }
   };
 }

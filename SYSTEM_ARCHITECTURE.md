@@ -256,6 +256,8 @@ weekend group assignments
 leave records
 off-day requests
 shift type definitions
+active duty locations
+active bias criteria
 prior bias ledger
 roster date range
 
@@ -300,6 +302,9 @@ type GenerateRosterInput = {
   leaves: Leave[]
   offRequests: OffRequest[]
   currentBias: BiasLedger[]
+  activeBiasCriteria: BiasCriteria[]
+  activeDutyLocations: DutyLocation[]
+  generationLocationId: string
   weekendGroupSchedule: WeekendGroupSchedule
 }
 
@@ -384,33 +389,35 @@ Bias is the carry-forward correction mechanism.
 
 ### 11.2 Bias Dimensions
 
-Bias must be tracked separately for:
+Primary bias is now tracked by admin-defined `BiasCriteria` records rather than
+hardcoded weekday/weekend buckets.
 
-- weekday_day
-- weekday_night
-- weekend_day
-- weekend_night
+Each criteria may match shifts by:
 
-Optional future dimensions:
+- duty location
+- shift type
+- weekday conditions
+- weekend-only restriction
 
-- Friday night
-- custom duty type
-- day-of-week pair bias
+This allows V1 fairness dimensions such as:
 
-These are not required in V1.
+- all CCU shifts
+- all night shifts
+- Monday night shifts
+- weekend-only shifts
+
+Historical weekday-pair ledgers may still exist on old snapshots for backward
+compatibility, but new roster generations use criteria-based primary bias.
 
 ### 11.3 Bias Ledger Shape
 
 ```
-type BiasLedger = {  
-  doctorId: string  
-  weekdayDay: number  
-  weekdayNight: number  
-  weekendDay: number  
-  weekendNight: number  
-  updatedAt: string  
+type BiasLedger = {
+  doctorId: string
+  effectiveMonth: string
+  balances: Record<string, number>
+  updatedAt: string
 }
-
 ```
 ### Interpretation
 
@@ -418,6 +425,14 @@ type BiasLedger = {
 - negative = doctor has done less than fair share
 
 Generation should prefer correcting negative bias first.
+
+### 11.4 Historical Safety
+
+New roster snapshots must store the exact active criteria and duty-location
+records used at generation time.
+
+Later admin edits must affect only future generations and must not rewrite the
+meaning of past roster snapshots or their bias outputs.
 
 ## 12. ELIGIBILITY ENGINE
 
@@ -937,7 +952,8 @@ Fairness is availability-adjusted, not absolute.
 
 ### Decision 2
 
-Weekend and weekday fairness are tracked separately.
+Primary fairness is tracked by admin-defined criteria, while weekend rules remain
+explicit operational constraints.
 
 ### Decision 3
 

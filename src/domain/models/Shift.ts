@@ -11,6 +11,7 @@ import type {
 
 export interface ShiftDefinitionSnapshot {
   readonly shiftTypeId: EntityId;
+  readonly locationId: EntityId;
   readonly code: string;
   readonly label: string;
   readonly startTime: TimeOfDayString;
@@ -22,6 +23,7 @@ export interface Shift {
   readonly rosterId: EntityId;
   readonly date: ISODateString;
   readonly shiftTypeId: EntityId;
+  readonly locationId: EntityId;
   readonly startTime: TimeOfDayString;
   readonly endTime: TimeOfDayString;
   readonly type: ShiftKind;

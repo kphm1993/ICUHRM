@@ -1,20 +1,22 @@
 import type {
-  BiasBalance,
   BiasLedger,
+  BiasLedgerBalances,
   EntityId,
   WeekdayPairBiasBalance,
   WeekdayPairBiasLedger,
   YearMonthString
 } from "@/domain/models";
 import type {
+  BiasCriteriaRepository,
   BiasLedgerRepository,
   WeekdayPairBiasLedgerRepository
 } from "@/domain/repositories";
+import { createEmptyBiasLedgerBalances } from "@/domain/scheduling/biasBuckets";
 
 export interface AdjustBiasInput {
   readonly doctorId: EntityId;
   readonly effectiveMonth: YearMonthString;
-  readonly delta: BiasBalance;
+  readonly delta: BiasLedgerBalances;
   readonly reason: string;
   readonly updatedByActorId: EntityId;
 }
@@ -46,13 +48,6 @@ export interface BiasManagementService {
   ): Promise<ReadonlyArray<WeekdayPairBiasLedger>>;
 }
 
-const EMPTY_BIAS_BALANCE: BiasBalance = {
-  weekdayDay: 0,
-  weekdayNight: 0,
-  weekendDay: 0,
-  weekendNight: 0
-};
-
 const EMPTY_WEEKDAY_PAIR_BIAS_BALANCE: WeekdayPairBiasBalance = {
   mondayDay: 0,
   mondayNight: 0,
@@ -74,17 +69,18 @@ export interface AdjustWeekdayPairBiasInput {
   readonly updatedByActorId: EntityId;
 }
 
-function createZeroBiasBalance(): BiasBalance {
-  return { ...EMPTY_BIAS_BALANCE };
-}
+function addBiasLedgerBalances(
+  left: Readonly<Record<EntityId, number>>,
+  right: Readonly<Record<EntityId, number>>
+): BiasLedgerBalances {
+  const criteriaIds = new Set([...Object.keys(left), ...Object.keys(right)]);
+  const nextBalances: Record<EntityId, number> = {};
 
-function addBiasBalances(left: BiasBalance, right: BiasBalance): BiasBalance {
-  return {
-    weekdayDay: left.weekdayDay + right.weekdayDay,
-    weekdayNight: left.weekdayNight + right.weekdayNight,
-    weekendDay: left.weekendDay + right.weekendDay,
-    weekendNight: left.weekendNight + right.weekendNight
-  };
+  for (const criteriaId of criteriaIds) {
+    nextBalances[criteriaId] = (left[criteriaId] ?? 0) + (right[criteriaId] ?? 0);
+  }
+
+  return nextBalances;
 }
 
 function createZeroWeekdayPairBiasBalance(): WeekdayPairBiasBalance {
@@ -110,8 +106,25 @@ function addWeekdayPairBiasBalances(
 }
 
 export interface BiasManagementServiceDependencies {
+  readonly biasCriteriaRepository: BiasCriteriaRepository;
   readonly biasLedgerRepository: BiasLedgerRepository;
   readonly weekdayPairBiasLedgerRepository: WeekdayPairBiasLedgerRepository;
+}
+
+async function listActiveCriteriaIds(
+  criteriaRepository: BiasCriteriaRepository
+): Promise<ReadonlyArray<EntityId>> {
+  const criteria = await criteriaRepository.listActive();
+  return criteria.map((entry) => entry.id);
+}
+
+function createZeroCriteriaBalances(
+  criteriaIds: ReadonlyArray<EntityId>
+): BiasLedgerBalances {
+  return criteriaIds.reduce<Record<EntityId, number>>((result, criteriaId) => {
+    result[criteriaId] = 0;
+    return result;
+  }, {});
 }
 
 export function createBiasManagementService(
@@ -128,8 +141,8 @@ export function createBiasManagementService(
           input.effectiveMonth
         );
 
-      const nextBalance = addBiasBalances(
-        existingLedger?.balance ?? createZeroBiasBalance(),
+      const nextBalance = addBiasLedgerBalances(
+        existingLedger?.balances ?? createEmptyBiasLedgerBalances(),
         input.delta
       );
 
@@ -139,7 +152,7 @@ export function createBiasManagementService(
         id: existingLedger?.id ?? crypto.randomUUID(),
         doctorId: input.doctorId,
         effectiveMonth: input.effectiveMonth,
-        balance: nextBalance,
+        balances: nextBalance,
         source: "MANUAL_ADJUSTMENT",
         sourceReferenceId: existingLedger?.sourceReferenceId,
         updatedAt: new Date().toISOString(),
@@ -152,12 +165,18 @@ export function createBiasManagementService(
           doctorId,
           effectiveMonth
         );
+      const activeCriteriaIds = await listActiveCriteriaIds(
+        dependencies.biasCriteriaRepository
+      );
 
       return dependencies.biasLedgerRepository.save({
         id: existingLedger?.id ?? crypto.randomUUID(),
         doctorId,
         effectiveMonth,
-        balance: createZeroBiasBalance(),
+        balances:
+          activeCriteriaIds.length > 0
+            ? createZeroCriteriaBalances(activeCriteriaIds)
+            : createEmptyBiasLedgerBalances(),
         source: "RESET",
         sourceReferenceId: existingLedger?.sourceReferenceId,
         updatedAt: new Date().toISOString(),
@@ -167,10 +186,17 @@ export function createBiasManagementService(
     async resetAllBias(effectiveMonth, updatedByActorId) {
       const ledgers = await dependencies.biasLedgerRepository.listByMonth(effectiveMonth);
       const timestamp = new Date().toISOString();
+      const activeCriteriaIds = await listActiveCriteriaIds(
+        dependencies.biasCriteriaRepository
+      );
+      const zeroBalances =
+        activeCriteriaIds.length > 0
+          ? createZeroCriteriaBalances(activeCriteriaIds)
+          : createEmptyBiasLedgerBalances();
 
       const resetLedgers = ledgers.map((ledger) => ({
         ...ledger,
-        balance: createZeroBiasBalance(),
+        balances: { ...zeroBalances },
         source: "RESET" as const,
         updatedAt: timestamp,
         updatedByActorId

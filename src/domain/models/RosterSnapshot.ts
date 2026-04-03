@@ -1,6 +1,8 @@
 import type {
   Assignment,
+  BiasCriteria,
   BiasLedger,
+  DutyLocation,
   EntityId,
   Roster,
   RosterPeriod,
@@ -29,6 +31,8 @@ export interface GeneratedRosterInputSummary {
   readonly shiftTypeCount: number;
   readonly firstWeekendOffGroup: WeekendGroup;
   readonly weekendGroupSchedule: ReadonlyArray<WeekendGroupScheduleEntry>;
+  readonly activeBiasCriteria: ReadonlyArray<BiasCriteria>;
+  readonly activeDutyLocations: ReadonlyArray<DutyLocation>;
 }
 
 export interface RosterSnapshot {

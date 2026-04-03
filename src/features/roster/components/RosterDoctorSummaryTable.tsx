@@ -1,6 +1,7 @@
 import type { RosterDoctorSummaryRow } from "@/features/roster/selectors/rosterReviewSelectors";
 import {
   formatBiasBalance,
+  formatBiasDisplayEntries,
   formatWeekdayPairBiasBalance
 } from "@/features/roster/lib/formatters";
 
@@ -50,21 +51,48 @@ export function RosterDoctorSummaryTable(props: RosterDoctorSummaryTableProps) {
 
             <div className="mt-3 space-y-2 text-sm text-slate-700">
               <p>
-                <span className="font-semibold text-slate-900">Current primary bias:</span>{" "}
-                {formatBiasBalance(row.currentBias)}
+                <span className="font-semibold text-slate-900">
+                  {row.primaryBiasMode === "criteria"
+                    ? "Current criteria bias:"
+                    : "Current primary bias:"}
+                </span>{" "}
+                {row.primaryBiasMode === "criteria"
+                  ? formatBiasDisplayEntries(row.currentPrimaryBiasEntries)
+                  : formatBiasBalance(row.currentBias ?? {
+                      weekdayDay: 0,
+                      weekdayNight: 0,
+                      weekendDay: 0,
+                      weekendNight: 0
+                    })}
               </p>
               <p>
-                <span className="font-semibold text-slate-900">Projected primary bias:</span>{" "}
-                {row.projectedBias ? formatBiasBalance(row.projectedBias) : "Not available"}
+                <span className="font-semibold text-slate-900">
+                  {row.primaryBiasMode === "criteria"
+                    ? "Projected criteria bias:"
+                    : "Projected primary bias:"}
+                </span>{" "}
+                {row.primaryBiasMode === "criteria"
+                  ? formatBiasDisplayEntries(row.projectedPrimaryBiasEntries)
+                  : row.projectedBias
+                    ? formatBiasBalance(row.projectedBias)
+                    : "Not available"}
               </p>
-              <p>
-                <span className="font-semibold text-slate-900">Current weekday-pair bias:</span>{" "}
-                {formatWeekdayPairBiasBalance(row.currentWeekdayPairBias)}
-              </p>
-              <p>
-                <span className="font-semibold text-slate-900">Projected weekday-pair bias:</span>{" "}
-                {formatWeekdayPairBiasBalance(row.projectedWeekdayPairBias)}
-              </p>
+              {row.showWeekdayPairBias ? (
+                <>
+                  <p>
+                    <span className="font-semibold text-slate-900">
+                      Current weekday-pair bias:
+                    </span>{" "}
+                    {formatWeekdayPairBiasBalance(row.currentWeekdayPairBias)}
+                  </p>
+                  <p>
+                    <span className="font-semibold text-slate-900">
+                      Projected weekday-pair bias:
+                    </span>{" "}
+                    {formatWeekdayPairBiasBalance(row.projectedWeekdayPairBias)}
+                  </p>
+                </>
+              ) : null}
             </div>
           </article>
         ))}

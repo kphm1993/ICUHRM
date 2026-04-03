@@ -1,5 +1,6 @@
 import {
   ROSTER_SEED_BIAS_LEDGERS,
+  ROSTER_SEED_BIAS_CRITERIA,
   ROSTER_SEED_DOCTORS,
   ROSTER_SEED_LEAVES,
   ROSTER_SEED_OFF_REQUESTS,
@@ -202,6 +203,7 @@ export function runHistoricalDoctorReferenceExample() {
         endDate: "2026-03-31"
       },
       status: "LOCKED",
+      isDeleted: false,
       createdAt: "2026-03-28T10:00:00.000Z",
       createdByUserId: "user-admin-demo",
       generatedAt: "2026-03-28T10:00:00.000Z",
@@ -237,7 +239,9 @@ export function runHistoricalDoctorReferenceExample() {
       offRequestCount: 0,
       shiftTypeCount: 2,
       firstWeekendOffGroup: "A",
-      weekendGroupSchedule: []
+      weekendGroupSchedule: [],
+      activeBiasCriteria: ROSTER_SEED_BIAS_CRITERIA,
+      activeDutyLocations: []
     }
   };
 
@@ -245,7 +249,8 @@ export function runHistoricalDoctorReferenceExample() {
     doctors: currentDoctors,
     snapshot,
     currentBias: [],
-    currentWeekdayPairBias: []
+    currentWeekdayPairBias: [],
+    activeBiasCriteria: []
   });
 
   return {
