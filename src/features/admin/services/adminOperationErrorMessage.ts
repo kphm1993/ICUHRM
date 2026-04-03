@@ -1,4 +1,5 @@
 import {
+  CriteriaLockedError,
   CriteriaInUseError,
   LocationInUseError,
   NoCriteriaDefinedError,
@@ -31,6 +32,10 @@ export function getAdminOperationErrorMessage(
 
   if (error instanceof CriteriaInUseError) {
     return `${error.message} Deactivate the criteria instead if you only want to stop future tracking.`;
+  }
+
+  if (error instanceof CriteriaLockedError) {
+    return error.message;
   }
 
   if (error instanceof RosterDeletionError) {

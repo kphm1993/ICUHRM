@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  CriteriaLockedError,
   CriteriaInUseError,
   LocationInUseError,
   NoCriteriaDefinedError,
@@ -34,6 +35,15 @@ describe("getAdminOperationErrorMessage", () => {
         "Fallback."
       )
     ).toContain("Deactivate the criteria instead");
+  });
+
+  it("returns locked-criteria guidance directly", () => {
+    expect(
+      getAdminOperationErrorMessage(
+        new CriteriaLockedError("Bias criteria 'Weekend' is locked. Unlock it before you edit it."),
+        "Fallback."
+      )
+    ).toBe("Bias criteria 'Weekend' is locked. Unlock it before you edit it.");
   });
 
   it("preserves explicit location blocking messages", () => {

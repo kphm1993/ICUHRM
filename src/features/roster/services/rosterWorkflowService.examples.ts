@@ -46,6 +46,7 @@ const EXAMPLE_BIAS_CRITERIA = [
     weekdayConditions: [],
     isWeekendOnly: false,
     isActive: true,
+    isLocked: false,
     createdAt: "2026-04-01T00:00:00.000Z",
     updatedAt: "2026-04-01T00:00:00.000Z",
     createdByActorId: "user-admin-demo",
@@ -60,6 +61,7 @@ const EXAMPLE_BIAS_CRITERIA = [
     weekdayConditions: [],
     isWeekendOnly: false,
     isActive: true,
+    isLocked: false,
     createdAt: "2026-04-01T00:00:00.000Z",
     updatedAt: "2026-04-01T00:00:00.000Z",
     createdByActorId: "user-admin-demo",
@@ -93,12 +95,14 @@ function createExampleWorkflow(storageKeyPrefix: string) {
   const biasCriteriaRepository = new InMemoryBiasCriteriaRepository(
     EXAMPLE_BIAS_CRITERIA
   );
+  const doctorRepository = new InMemoryDoctorRepository(ROSTER_SEED_DOCTORS);
   const dutyLocationRepository = new InMemoryDutyLocationRepository(
     ROSTER_SEED_DUTY_LOCATIONS
   );
   const biasCriteriaManagementService = createBiasCriteriaManagementService({
     biasCriteriaRepository,
     biasLedgerRepository,
+    doctorRepository,
     rosterSnapshotRepository,
     auditLogService
   });
@@ -112,7 +116,7 @@ function createExampleWorkflow(storageKeyPrefix: string) {
   const workflowService = createRosterWorkflowService({
     biasCriteriaManagementService,
     doctorManagementService: createDoctorManagementService({
-      doctorRepository: new InMemoryDoctorRepository(ROSTER_SEED_DOCTORS),
+      doctorRepository,
       leaveRepository: new InMemoryLeaveRepository(ROSTER_SEED_LEAVES),
       offRequestRepository,
       biasLedgerRepository: new InMemoryBiasLedgerRepository(ROSTER_SEED_BIAS_LEDGERS),

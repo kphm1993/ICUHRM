@@ -13,6 +13,9 @@ export interface BiasCriteria {
   readonly weekdayConditions: ReadonlyArray<DayOfWeek>;
   readonly isWeekendOnly: boolean;
   readonly isActive: boolean;
+  readonly isLocked: boolean;
+  readonly lockedAt?: ISODateTimeString;
+  readonly lockedByActorId?: EntityId;
   readonly createdAt: ISODateTimeString;
   readonly updatedAt: ISODateTimeString;
   readonly createdByActorId: EntityId;

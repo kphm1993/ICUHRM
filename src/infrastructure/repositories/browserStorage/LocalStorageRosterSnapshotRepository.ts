@@ -70,6 +70,18 @@ function cloneValidation(validation: ValidationResult): ValidationResult {
   };
 }
 
+function normalizeBiasCriteria(criteria: BiasCriteria): BiasCriteria {
+  return {
+    ...criteria,
+    isLocked: criteria.isLocked ?? false,
+    lockedAt: criteria.lockedAt,
+    lockedByActorId: criteria.lockedByActorId,
+    locationIds: [...criteria.locationIds],
+    shiftTypeIds: [...criteria.shiftTypeIds],
+    weekdayConditions: [...criteria.weekdayConditions]
+  };
+}
+
 function cloneGeneratedInputSummary(
   summary: GeneratedRosterInputSummary
 ): GeneratedRosterInputSummary {
@@ -77,12 +89,7 @@ function cloneGeneratedInputSummary(
     ...summary,
     range: { ...summary.range },
     weekendGroupSchedule: summary.weekendGroupSchedule.map((entry) => ({ ...entry })),
-    activeBiasCriteria: (summary.activeBiasCriteria ?? []).map((criteria) => ({
-      ...criteria,
-      locationIds: [...criteria.locationIds],
-      shiftTypeIds: [...criteria.shiftTypeIds],
-      weekdayConditions: [...criteria.weekdayConditions]
-    })),
+    activeBiasCriteria: (summary.activeBiasCriteria ?? []).map(normalizeBiasCriteria),
     activeDutyLocations: (summary.activeDutyLocations ?? []).map((location) => ({
       ...location
     }))
@@ -123,12 +130,7 @@ function normalizeGeneratedInputSummary(
 ): GeneratedRosterInputSummary {
   return {
     ...summary,
-    activeBiasCriteria: (summary.activeBiasCriteria ?? []).map((criteria) => ({
-      ...criteria,
-      locationIds: [...criteria.locationIds],
-      shiftTypeIds: [...criteria.shiftTypeIds],
-      weekdayConditions: [...criteria.weekdayConditions]
-    })),
+    activeBiasCriteria: (summary.activeBiasCriteria ?? []).map(normalizeBiasCriteria),
     activeDutyLocations: (summary.activeDutyLocations ?? []).map((location) => ({
       ...location
     }))

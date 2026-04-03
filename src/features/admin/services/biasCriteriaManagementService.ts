@@ -1,15 +1,19 @@
 import type {
   ActorRole,
   BiasCriteria,
+  Doctor,
   DayOfWeek,
-  EntityId
+  EntityId,
+  YearMonthString
 } from "@/domain/models";
 import type {
   BiasCriteriaRepository,
   BiasLedgerRepository,
+  DoctorRepository,
   RosterSnapshotRepository
 } from "@/domain/repositories";
 import {
+  CriteriaLockedError,
   CriteriaInUseError,
   RepositoryNotFoundError
 } from "@/domain/repositories";
@@ -40,18 +44,37 @@ export interface ToggleBiasCriteriaActiveInput extends BiasCriteriaActorInput {
   readonly isActive: boolean;
 }
 
+export interface ToggleBiasCriteriaLockInput extends BiasCriteriaActorInput {
+  readonly id: EntityId;
+  readonly isLocked: boolean;
+}
+
+export interface DoctorBiasSummary {
+  readonly doctorId: EntityId;
+  readonly doctorName: string;
+  readonly doctorUniqueId: string;
+  readonly biasValue: number;
+  readonly isActive: boolean;
+}
+
 export interface BiasCriteriaManagementService {
   getCriteriaList(): Promise<ReadonlyArray<BiasCriteria>>;
   getCriteriaLabel(id: EntityId): Promise<string | null>;
+  getDoctorsByBiasForCriteria(input: {
+    readonly criteriaId: EntityId;
+    readonly currentMonth: YearMonthString;
+  }): Promise<ReadonlyArray<DoctorBiasSummary>>;
   createCriteria(input: CreateBiasCriteriaInput): Promise<BiasCriteria>;
   updateCriteria(input: UpdateBiasCriteriaInput): Promise<BiasCriteria>;
   toggleCriteriaActive(input: ToggleBiasCriteriaActiveInput): Promise<BiasCriteria>;
+  toggleCriteriaLock(input: ToggleBiasCriteriaLockInput): Promise<BiasCriteria>;
   deleteCriteria(input: BiasCriteriaActorInput & { readonly id: EntityId }): Promise<void>;
 }
 
 export interface BiasCriteriaManagementServiceDependencies {
   readonly biasCriteriaRepository: BiasCriteriaRepository;
   readonly biasLedgerRepository: BiasLedgerRepository;
+  readonly doctorRepository: DoctorRepository;
   readonly rosterSnapshotRepository: RosterSnapshotRepository;
   readonly auditLogService: AuditLogService;
 }
@@ -64,6 +87,8 @@ async function appendCriteriaAuditLog(
       | "BIAS_CRITERIA_UPDATED"
       | "BIAS_CRITERIA_ACTIVATED"
       | "BIAS_CRITERIA_DEACTIVATED"
+      | "BIAS_CRITERIA_LOCKED"
+      | "BIAS_CRITERIA_UNLOCKED"
       | "BIAS_CRITERIA_DELETED"
       | "BIAS_CRITERIA_DELETE_BLOCKED";
     readonly criteria: BiasCriteria;
@@ -142,6 +167,49 @@ async function assertCriteriaCanBeDeleted(
   }
 }
 
+function assertCriteriaUnlocked(
+  criteria: BiasCriteria,
+  actionLabel: "edit" | "change status" | "delete"
+): void {
+  if (!criteria.isLocked) {
+    return;
+  }
+
+  throw new CriteriaLockedError(
+    `Bias criteria '${criteria.label}' is locked. Unlock it before you ${actionLabel} it.`
+  );
+}
+
+function buildDoctorBiasSummary(
+  doctor: Doctor,
+  biasValue: number
+): DoctorBiasSummary {
+  return {
+    doctorId: doctor.id,
+    doctorName: doctor.name,
+    doctorUniqueId: doctor.uniqueIdentifier,
+    biasValue,
+    isActive: doctor.isActive
+  };
+}
+
+function sortDoctorBiasSummaries(
+  summaries: ReadonlyArray<DoctorBiasSummary>
+): ReadonlyArray<DoctorBiasSummary> {
+  return [...summaries].sort((left, right) => {
+    if (left.biasValue !== right.biasValue) {
+      return left.biasValue - right.biasValue;
+    }
+
+    const nameComparison = left.doctorName.localeCompare(right.doctorName);
+    if (nameComparison !== 0) {
+      return nameComparison;
+    }
+
+    return left.doctorId.localeCompare(right.doctorId);
+  });
+}
+
 export function createBiasCriteriaManagementService(
   dependencies: BiasCriteriaManagementServiceDependencies
 ): BiasCriteriaManagementService {
@@ -152,6 +220,30 @@ export function createBiasCriteriaManagementService(
     async getCriteriaLabel(id) {
       const criteria = await dependencies.biasCriteriaRepository.getById(id);
       return criteria?.label ?? null;
+    },
+    async getDoctorsByBiasForCriteria(input) {
+      await loadCriteriaOrThrow(
+        dependencies.biasCriteriaRepository,
+        input.criteriaId
+      );
+
+      const [doctors, biasLedgers] = await Promise.all([
+        dependencies.doctorRepository.list(),
+        dependencies.biasLedgerRepository.listByMonth(input.currentMonth)
+      ]);
+
+      const biasLedgerByDoctorId = new Map(
+        biasLedgers.map((ledger) => [ledger.doctorId, ledger])
+      );
+
+      return sortDoctorBiasSummaries(
+        doctors.map((doctor) =>
+          buildDoctorBiasSummary(
+            doctor,
+            biasLedgerByDoctorId.get(doctor.id)?.balances[input.criteriaId] ?? 0
+          )
+        )
+      );
     },
     async createCriteria(input) {
       const normalizedInput = validateBiasCriteriaInput(input);
@@ -170,6 +262,7 @@ export function createBiasCriteriaManagementService(
         weekdayConditions: normalizedInput.weekdayConditions,
         isWeekendOnly: normalizedInput.isWeekendOnly,
         isActive: true,
+        isLocked: false,
         createdAt: timestamp,
         updatedAt: timestamp,
         createdByActorId: input.actorId,
@@ -199,6 +292,7 @@ export function createBiasCriteriaManagementService(
         dependencies.biasCriteriaRepository,
         input.id
       );
+      assertCriteriaUnlocked(criteria, "edit");
       const normalizedInput = validateBiasCriteriaInput(input);
       await assertCriteriaCodeAvailable(
         dependencies.biasCriteriaRepository,
@@ -297,6 +391,7 @@ export function createBiasCriteriaManagementService(
         dependencies.biasCriteriaRepository,
         input.id
       );
+      assertCriteriaUnlocked(criteria, "change status");
 
       if (criteria.isActive === input.isActive) {
         return criteria;
@@ -323,11 +418,61 @@ export function createBiasCriteriaManagementService(
 
       return updatedCriteria;
     },
+    async toggleCriteriaLock(input) {
+      const criteria = await loadCriteriaOrThrow(
+        dependencies.biasCriteriaRepository,
+        input.id
+      );
+
+      if (criteria.isLocked === input.isLocked) {
+        return criteria;
+      }
+
+      const updatedCriteria = await dependencies.biasCriteriaRepository.update(criteria.id, {
+        isLocked: input.isLocked,
+        lockedAt: input.isLocked ? new Date().toISOString() : undefined,
+        lockedByActorId: input.isLocked ? input.actorId : undefined,
+        updatedAt: new Date().toISOString(),
+        updatedByActorId: input.actorId
+      });
+
+      await appendCriteriaAuditLog(dependencies, {
+        actionType: updatedCriteria.isLocked
+          ? "BIAS_CRITERIA_LOCKED"
+          : "BIAS_CRITERIA_UNLOCKED",
+        criteria: updatedCriteria,
+        actorId: input.actorId,
+        actorRole: input.actorRole,
+        details: {
+          previousLockStatus: criteria.isLocked ? "LOCKED" : "UNLOCKED",
+          nextLockStatus: updatedCriteria.isLocked ? "LOCKED" : "UNLOCKED",
+          lockedAt: updatedCriteria.lockedAt ?? null,
+          lockedByActorId: updatedCriteria.lockedByActorId ?? null
+        }
+      });
+
+      return updatedCriteria;
+    },
     async deleteCriteria(input) {
       const criteria = await loadCriteriaOrThrow(
         dependencies.biasCriteriaRepository,
         input.id
       );
+
+      try {
+        assertCriteriaUnlocked(criteria, "delete");
+      } catch (error) {
+        await appendCriteriaAuditLog(dependencies, {
+          actionType: "BIAS_CRITERIA_DELETE_BLOCKED",
+          criteria,
+          actorId: input.actorId,
+          actorRole: input.actorRole,
+          details: {
+            message: error instanceof Error ? error.message : "Criteria delete blocked."
+          }
+        });
+        throw error;
+      }
 
       try {
         await assertCriteriaCanBeDeleted(dependencies, criteria);

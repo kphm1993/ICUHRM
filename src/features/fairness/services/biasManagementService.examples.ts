@@ -23,6 +23,7 @@ const EXAMPLE_BIAS_CRITERIA: ReadonlyArray<BiasCriteria> = [
     weekdayConditions: ["SAT", "SUN"],
     isWeekendOnly: true,
     isActive: true,
+    isLocked: false,
     createdAt: "2026-04-01T00:00:00.000Z",
     updatedAt: "2026-04-01T00:00:00.000Z",
     createdByActorId: "user-admin-demo",

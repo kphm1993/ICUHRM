@@ -3,13 +3,15 @@ import type {
   BiasCriteria,
   DayOfWeek,
   DutyLocation,
-  ShiftType
+  ShiftType,
+  YearMonthString
 } from "@/domain/models";
 import { useAppServices } from "@/app/providers/useAppServices";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import { buildBiasCriteriaPreview } from "@/features/admin/services/biasCriteriaPreview";
 import { getAdminOperationErrorMessage } from "@/features/admin/services/adminOperationErrorMessage";
 import { BiasCriteriaValidationError } from "@/features/admin/services/biasCriteriaManagementValidation";
+import type { DoctorBiasSummary } from "@/features/admin/services/biasCriteriaManagementService";
 
 export interface BiasCriteriaFormValues {
   readonly code: string;
@@ -28,7 +30,7 @@ export interface BiasCriteriaFormFieldErrors {
 }
 
 type FormMode = "create" | "edit";
-type BiasCriteriaAction = "save" | "delete" | "status" | null;
+type BiasCriteriaAction = "save" | "delete" | "status" | "lock" | null;
 
 const WEEKDAY_ORDER: ReadonlyArray<DayOfWeek> = [
   "MON",
@@ -83,6 +85,10 @@ function toggleListValue<T extends string>(
     : [...values, value];
 }
 
+function getCurrentBiasMonth(): YearMonthString {
+  return new Date().toISOString().slice(0, 7) as YearMonthString;
+}
+
 export function useBiasCriteriaManagement() {
   const {
     biasCriteriaManagementService,
@@ -103,6 +109,15 @@ export function useBiasCriteriaManagement() {
   const [activeAction, setActiveAction] = useState<BiasCriteriaAction>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [expandedCriteriaId, setExpandedCriteriaId] = useState<string | null>(null);
+  const [doctorBiasListsByCriteriaId, setDoctorBiasListsByCriteriaId] = useState<
+    Record<string, ReadonlyArray<DoctorBiasSummary>>
+  >({});
+  const [loadingDoctorBiasCriteriaIds, setLoadingDoctorBiasCriteriaIds] =
+    useState<ReadonlySet<string>>(new Set());
+  const [doctorBiasListErrors, setDoctorBiasListErrors] = useState<
+    Record<string, string>
+  >({});
 
   const selectedCriteria =
     criteriaEntries.find((criteria) => criteria.id === selectedCriteriaId) ?? null;
@@ -151,6 +166,18 @@ export function useBiasCriteriaManagement() {
         setFormMode("create");
         setFormValues(createEmptyBiasCriteriaFormValues());
       }
+
+      setExpandedCriteriaId((currentExpandedCriteriaId) => {
+        if (currentExpandedCriteriaId === null) {
+          return null;
+        }
+
+        return nextCriteriaEntries.some(
+          (criteria) => criteria.id === currentExpandedCriteriaId
+        )
+          ? currentExpandedCriteriaId
+          : null;
+      });
     } catch (error) {
       setErrorMessage(
         getAdminOperationErrorMessage(error, "Unable to load bias criteria.")
@@ -182,6 +209,7 @@ export function useBiasCriteriaManagement() {
     clearMessages();
     clearFieldErrors();
     setSelectedCriteriaId(null);
+    setExpandedCriteriaId(null);
     setFormMode("create");
     setFormValues(createEmptyBiasCriteriaFormValues());
   }
@@ -198,6 +226,71 @@ export function useBiasCriteriaManagement() {
     setSelectedCriteriaId(criteria.id);
     setFormMode("edit");
     setFormValues(createFormValuesFromCriteria(criteria));
+  }
+
+  async function loadDoctorBiasList(criteriaId: string, forceReload = false) {
+    if (!forceReload && doctorBiasListsByCriteriaId[criteriaId]) {
+      return;
+    }
+
+    setLoadingDoctorBiasCriteriaIds((currentIds) => {
+      const nextIds = new Set(currentIds);
+      nextIds.add(criteriaId);
+      return nextIds;
+    });
+    setDoctorBiasListErrors((currentErrors) => {
+      const nextErrors = { ...currentErrors };
+      delete nextErrors[criteriaId];
+      return nextErrors;
+    });
+
+    try {
+      const doctorBiasList =
+        await biasCriteriaManagementService.getDoctorsByBiasForCriteria({
+          criteriaId,
+          currentMonth: getCurrentBiasMonth()
+        });
+
+      setDoctorBiasListsByCriteriaId((currentLists) => ({
+        ...currentLists,
+        [criteriaId]: doctorBiasList
+      }));
+    } catch (error) {
+      setDoctorBiasListErrors((currentErrors) => ({
+        ...currentErrors,
+        [criteriaId]: getAdminOperationErrorMessage(
+          error,
+          "Unable to load doctor bias data."
+        )
+      }));
+    } finally {
+      setLoadingDoctorBiasCriteriaIds((currentIds) => {
+        const nextIds = new Set(currentIds);
+        nextIds.delete(criteriaId);
+        return nextIds;
+      });
+    }
+  }
+
+  function handleCriteriaCardClick(criteriaId: string) {
+    if (expandedCriteriaId === criteriaId) {
+      setExpandedCriteriaId(null);
+      return;
+    }
+
+    beginEditCriteria(criteriaId);
+    setExpandedCriteriaId(criteriaId);
+
+    if (
+      !doctorBiasListsByCriteriaId[criteriaId] &&
+      doctorBiasListErrors[criteriaId] === undefined
+    ) {
+      void loadDoctorBiasList(criteriaId);
+    }
+  }
+
+  function retryDoctorBiasList(criteriaId: string) {
+    void loadDoctorBiasList(criteriaId, true);
   }
 
   function updateTextField(field: "code" | "label", value: string) {
@@ -379,12 +472,40 @@ export function useBiasCriteriaManagement() {
     });
   }
 
+  async function toggleCriteriaLock() {
+    if (!user || !role || !selectedCriteria) {
+      setErrorMessage("Select a bias criteria record before changing lock state.");
+      return;
+    }
+
+    await runAction("lock", async () => {
+      const updatedCriteria =
+        await biasCriteriaManagementService.toggleCriteriaLock({
+          id: selectedCriteria.id,
+          isLocked: !selectedCriteria.isLocked,
+          actorId: user.id,
+          actorRole: role
+        });
+
+      await loadData(updatedCriteria.id);
+      setSuccessMessage(
+        updatedCriteria.isLocked
+          ? `${updatedCriteria.label} is now locked.`
+          : `${updatedCriteria.label} is now unlocked.`
+      );
+    });
+  }
+
   return {
     criteriaEntries,
     locations,
     shiftTypes,
     selectedCriteria,
     selectedCriteriaId,
+    expandedCriteriaId,
+    doctorBiasListsByCriteriaId,
+    loadingDoctorBiasCriteriaIds,
+    doctorBiasListErrors,
     formMode,
     formValues,
     fieldErrors,
@@ -395,6 +516,8 @@ export function useBiasCriteriaManagement() {
     successMessage,
     beginCreateCriteria,
     beginEditCriteria,
+    handleCriteriaCardClick,
+    retryDoctorBiasList,
     updateTextField,
     toggleLocation,
     toggleShiftType,
@@ -404,6 +527,7 @@ export function useBiasCriteriaManagement() {
     cancelEditing,
     saveCriteria,
     toggleCriteriaStatus,
-    deleteCriteria
+    deleteCriteria,
+    toggleCriteriaLock
   };
 }

@@ -23,6 +23,13 @@ export class CriteriaInUseError extends Error {
   }
 }
 
+export class CriteriaLockedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "CriteriaLockedError";
+  }
+}
+
 export class LocationInUseError extends Error {
   constructor(message: string) {
     super(message);

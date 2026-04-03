@@ -14,6 +14,9 @@ import {
 function cloneBiasCriteria(criteria: BiasCriteria): BiasCriteria {
   return {
     ...criteria,
+    isLocked: criteria.isLocked ?? false,
+    lockedAt: criteria.lockedAt,
+    lockedByActorId: criteria.lockedByActorId,
     locationIds: [...criteria.locationIds],
     shiftTypeIds: [...criteria.shiftTypeIds],
     weekdayConditions: [...criteria.weekdayConditions]
@@ -66,7 +69,16 @@ export class LocalStorageBiasCriteriaRepository
       ...changes,
       id: existingCriteria.id,
       createdAt: existingCriteria.createdAt,
-      createdByActorId: existingCriteria.createdByActorId
+      createdByActorId: existingCriteria.createdByActorId,
+      isLocked: changes.isLocked ?? existingCriteria.isLocked ?? false,
+      lockedAt:
+        changes.isLocked === false
+          ? undefined
+          : (changes.lockedAt ?? existingCriteria.lockedAt),
+      lockedByActorId:
+        changes.isLocked === false
+          ? undefined
+          : (changes.lockedByActorId ?? existingCriteria.lockedByActorId)
     };
 
     this.assertUniqueConstraints(nextCriteria, entries);

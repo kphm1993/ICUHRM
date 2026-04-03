@@ -39,10 +39,19 @@ export function AdminBiasCriteriaPage() {
       <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
         <BiasCriteriaList
           criteriaEntries={criteriaManagement.criteriaEntries}
+          doctorBiasListErrors={criteriaManagement.doctorBiasListErrors}
+          doctorBiasListsByCriteriaId={
+            criteriaManagement.doctorBiasListsByCriteriaId
+          }
+          expandedCriteriaId={criteriaManagement.expandedCriteriaId}
           isLoading={criteriaManagement.isLoading}
+          loadingDoctorBiasCriteriaIds={
+            criteriaManagement.loadingDoctorBiasCriteriaIds
+          }
           locations={criteriaManagement.locations}
           onCreateCriteria={criteriaManagement.beginCreateCriteria}
-          onSelectCriteria={criteriaManagement.beginEditCriteria}
+          onCriteriaCardClick={criteriaManagement.handleCriteriaCardClick}
+          onRetryDoctorBiasList={criteriaManagement.retryDoctorBiasList}
           selectedCriteriaId={criteriaManagement.selectedCriteriaId}
           shiftTypes={criteriaManagement.shiftTypes}
         />
@@ -59,6 +68,7 @@ export function AdminBiasCriteriaPage() {
           onSetWeekendOnly={criteriaManagement.setWeekendOnly}
           onSubmit={criteriaManagement.saveCriteria}
           onTextChange={criteriaManagement.updateTextField}
+          onToggleLock={criteriaManagement.toggleCriteriaLock}
           onToggleLocation={criteriaManagement.toggleLocation}
           onToggleShiftType={criteriaManagement.toggleShiftType}
           onToggleStatus={criteriaManagement.toggleCriteriaStatus}

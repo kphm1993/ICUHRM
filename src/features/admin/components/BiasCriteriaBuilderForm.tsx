@@ -17,7 +17,7 @@ interface BiasCriteriaBuilderFormProps {
   readonly locations: ReadonlyArray<DutyLocation>;
   readonly shiftTypes: ReadonlyArray<ShiftType>;
   readonly previewText: string;
-  readonly activeAction: "save" | "delete" | "status" | null;
+  readonly activeAction: "save" | "delete" | "status" | "lock" | null;
   readonly onTextChange: (field: "code" | "label", value: string) => void;
   readonly onToggleLocation: (locationId: string) => void;
   readonly onToggleShiftType: (shiftTypeId: string) => void;
@@ -28,6 +28,7 @@ interface BiasCriteriaBuilderFormProps {
   readonly onCancel: () => void;
   readonly onDelete: () => void;
   readonly onToggleStatus: () => void;
+  readonly onToggleLock: () => void;
 }
 
 const WEEKDAYS_ONLY: ReadonlyArray<DayOfWeek> = ["MON", "TUE", "WED", "THU", "FRI"];
@@ -74,6 +75,8 @@ function getPillClasses(isSelected: boolean) {
 export function BiasCriteriaBuilderForm(props: BiasCriteriaBuilderFormProps) {
   const selectedCriteria = props.criteria;
   const isEditing = props.mode === "edit" && selectedCriteria !== null;
+  const isLocked = selectedCriteria?.isLocked ?? false;
+  const areFieldsLocked = isEditing && isLocked;
 
   return (
     <section className="space-y-4 rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-panel">
@@ -100,6 +103,21 @@ export function BiasCriteriaBuilderForm(props: BiasCriteriaBuilderFormProps) {
             <span className="font-semibold text-slate-900">Current status:</span>{" "}
             {selectedCriteria.isActive ? "Active" : "Inactive"}
           </div>
+          <div>
+            <span className="font-semibold text-slate-900">Edit protection:</span>{" "}
+            {selectedCriteria.isLocked ? "Locked" : "Unlocked"}
+          </div>
+          <div>
+            <span className="font-semibold text-slate-900">Locked by:</span>{" "}
+            {selectedCriteria.lockedByActorId ?? "Not locked"}
+          </div>
+        </div>
+      ) : null}
+
+      {areFieldsLocked ? (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          This criteria is locked. Unlock it before editing the rule, changing its
+          active status, or deleting it.
         </div>
       ) : null}
 
@@ -115,6 +133,7 @@ export function BiasCriteriaBuilderForm(props: BiasCriteriaBuilderFormProps) {
             <span className="text-sm font-medium text-slate-700">Code</span>
             <input
               className={getInputClasses(Boolean(props.fieldErrors.code))}
+              disabled={areFieldsLocked}
               onChange={(event) => props.onTextChange("code", event.target.value)}
               type="text"
               value={props.values.code}
@@ -128,6 +147,7 @@ export function BiasCriteriaBuilderForm(props: BiasCriteriaBuilderFormProps) {
             <span className="text-sm font-medium text-slate-700">Label</span>
             <input
               className={getInputClasses(Boolean(props.fieldErrors.label))}
+              disabled={areFieldsLocked}
               onChange={(event) => props.onTextChange("label", event.target.value)}
               type="text"
               value={props.values.label}
@@ -154,6 +174,7 @@ export function BiasCriteriaBuilderForm(props: BiasCriteriaBuilderFormProps) {
                 className={getPillClasses(
                   props.values.locationIds.includes(location.id)
                 )}
+                disabled={areFieldsLocked}
                 onClick={() => props.onToggleLocation(location.id)}
                 type="button"
               >
@@ -179,6 +200,7 @@ export function BiasCriteriaBuilderForm(props: BiasCriteriaBuilderFormProps) {
                 className={getPillClasses(
                   props.values.shiftTypeIds.includes(shiftType.id)
                 )}
+                disabled={areFieldsLocked}
                 onClick={() => props.onToggleShiftType(shiftType.id)}
                 type="button"
               >
@@ -201,6 +223,7 @@ export function BiasCriteriaBuilderForm(props: BiasCriteriaBuilderFormProps) {
             <div className="flex flex-wrap gap-2">
               <button
                 className="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-brand-300 hover:text-brand-800"
+                disabled={areFieldsLocked}
                 onClick={() => props.onSetWeekdays(WEEKDAYS_ONLY)}
                 type="button"
               >
@@ -208,6 +231,7 @@ export function BiasCriteriaBuilderForm(props: BiasCriteriaBuilderFormProps) {
               </button>
               <button
                 className="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-brand-300 hover:text-brand-800"
+                disabled={areFieldsLocked}
                 onClick={() => props.onSetWeekdays(WEEKENDS_ONLY)}
                 type="button"
               >
@@ -215,6 +239,7 @@ export function BiasCriteriaBuilderForm(props: BiasCriteriaBuilderFormProps) {
               </button>
               <button
                 className="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-brand-300 hover:text-brand-800"
+                disabled={areFieldsLocked}
                 onClick={() => props.onSetWeekdays([])}
                 type="button"
               >
@@ -230,6 +255,7 @@ export function BiasCriteriaBuilderForm(props: BiasCriteriaBuilderFormProps) {
                 className={getPillClasses(
                   props.values.weekdayConditions.includes(day)
                 )}
+                disabled={areFieldsLocked}
                 onClick={() => props.onToggleWeekday(day)}
                 type="button"
               >
@@ -249,6 +275,7 @@ export function BiasCriteriaBuilderForm(props: BiasCriteriaBuilderFormProps) {
           <input
             checked={props.values.isWeekendOnly}
             className="mt-1 h-4 w-4 rounded border-slate-300 text-brand-700 focus:ring-brand-500"
+            disabled={areFieldsLocked}
             onChange={(event) => props.onSetWeekendOnly(event.target.checked)}
             type="checkbox"
           />
@@ -278,7 +305,7 @@ export function BiasCriteriaBuilderForm(props: BiasCriteriaBuilderFormProps) {
         <div className="flex flex-wrap gap-3 pt-2">
           <button
             className="rounded-full bg-brand-700 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-800 disabled:cursor-not-allowed disabled:bg-brand-400"
-            disabled={props.activeAction !== null}
+            disabled={props.activeAction !== null || areFieldsLocked}
             type="submit"
           >
             {getSubmitLabel(props.mode, props.activeAction === "save")}
@@ -295,8 +322,39 @@ export function BiasCriteriaBuilderForm(props: BiasCriteriaBuilderFormProps) {
 
           {isEditing ? (
             <button
-              className="rounded-full border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-brand-300 hover:text-brand-800 disabled:cursor-not-allowed disabled:opacity-60"
+              className={[
+                "rounded-full px-5 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60",
+                selectedCriteria.isLocked
+                  ? "border border-amber-300 bg-amber-50 text-amber-900 hover:border-amber-400 hover:bg-amber-100"
+                  : "border border-slate-300 bg-white text-slate-700 hover:border-brand-300 hover:text-brand-800"
+              ].join(" ")}
               disabled={props.activeAction !== null}
+              onClick={() => {
+                const nextVerb = selectedCriteria.isLocked ? "unlock" : "lock";
+                if (
+                  window.confirm(
+                    `Do you want to ${nextVerb} ${selectedCriteria.label}?`
+                  )
+                ) {
+                  props.onToggleLock();
+                }
+              }}
+              type="button"
+            >
+              {props.activeAction === "lock"
+                ? selectedCriteria.isLocked
+                  ? "Unlocking..."
+                  : "Locking..."
+                : selectedCriteria.isLocked
+                  ? "Unlock Criteria"
+                  : "Lock Criteria"}
+            </button>
+          ) : null}
+
+          {isEditing ? (
+            <button
+              className="rounded-full border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-brand-300 hover:text-brand-800 disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={props.activeAction !== null || areFieldsLocked}
               onClick={() => {
                 const nextVerb = selectedCriteria.isActive ? "deactivate" : "activate";
                 if (
@@ -322,7 +380,7 @@ export function BiasCriteriaBuilderForm(props: BiasCriteriaBuilderFormProps) {
           {isEditing ? (
             <button
               className="rounded-full border border-rose-300 bg-rose-50 px-5 py-2.5 text-sm font-semibold text-rose-700 transition hover:border-rose-400 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={props.activeAction !== null}
+              disabled={props.activeAction !== null || areFieldsLocked}
               onClick={() => {
                 if (
                   window.confirm(

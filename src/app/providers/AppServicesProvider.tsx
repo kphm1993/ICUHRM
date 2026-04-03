@@ -97,6 +97,7 @@ function createAppServices(): AppServices {
   const biasCriteriaManagementService = createBiasCriteriaManagementService({
     biasCriteriaRepository: repositories.biasCriteriaRepository,
     biasLedgerRepository: repositories.biasLedgerRepository,
+    doctorRepository: repositories.doctorRepository,
     rosterSnapshotRepository: repositories.rosterSnapshotRepository,
     auditLogService
   });

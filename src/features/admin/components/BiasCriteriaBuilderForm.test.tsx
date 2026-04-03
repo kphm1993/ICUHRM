@@ -69,6 +69,7 @@ function BiasCriteriaBuilderFormHarness() {
           [field]: value
         }))
       }
+      onToggleLock={() => undefined}
       onToggleLocation={(locationId) =>
         setValues((currentValues) => ({
           ...currentValues,
@@ -119,5 +120,95 @@ describe("BiasCriteriaBuilderForm", () => {
     await user.click(screen.getByRole("button", { name: "All Days" }));
 
     expect(screen.getByText("all locations; all shift types; all days.")).toBeInTheDocument();
+  });
+
+  it("disables editing controls when the selected criteria is locked", () => {
+    const lockedCriteria = {
+      id: "criteria-locked",
+      code: "LOCKED_RULE",
+      label: "Locked Rule",
+      locationIds: [] as ReadonlyArray<string>,
+      shiftTypeIds: [] as ReadonlyArray<string>,
+      weekdayConditions: [] as ReadonlyArray<DayOfWeek>,
+      isWeekendOnly: false,
+      isActive: true,
+      isLocked: true,
+      lockedAt: "2026-04-03T08:00:00.000Z",
+      lockedByActorId: "user-admin-demo",
+      createdAt: "2026-04-03T08:00:00.000Z",
+      updatedAt: "2026-04-03T08:00:00.000Z",
+      createdByActorId: "user-admin-demo",
+      updatedByActorId: "user-admin-demo"
+    };
+    const locations = [
+      {
+        id: "location-ccu",
+        code: "CCU",
+        label: "Cardiac Care Unit",
+        description: "Main unit",
+        isActive: true,
+        createdAt: "2026-04-03T08:00:00.000Z",
+        updatedAt: "2026-04-03T08:00:00.000Z"
+      }
+    ];
+    const shiftTypes = [
+      {
+        id: "shift-type-day",
+        code: "DAY",
+        label: "Day",
+        startTime: "08:00",
+        endTime: "20:00",
+        defaultKind: "DAY" as const,
+        isActive: true,
+        createdAt: "2026-04-03T08:00:00.000Z",
+        updatedAt: "2026-04-03T08:00:00.000Z"
+      }
+    ];
+
+    render(
+      <BiasCriteriaBuilderForm
+        activeAction={null}
+        criteria={lockedCriteria}
+        fieldErrors={{}}
+        locations={locations}
+        mode="edit"
+        onCancel={() => undefined}
+        onDelete={() => undefined}
+        onSetWeekdays={() => undefined}
+        onSetWeekendOnly={() => undefined}
+        onSubmit={() => undefined}
+        onTextChange={() => undefined}
+        onToggleLock={() => undefined}
+        onToggleLocation={() => undefined}
+        onToggleShiftType={() => undefined}
+        onToggleStatus={() => undefined}
+        onToggleWeekday={() => undefined}
+        previewText={buildBiasCriteriaPreview(lockedCriteria, {
+          locations,
+          shiftTypes
+        })}
+        shiftTypes={shiftTypes}
+        values={{
+          code: lockedCriteria.code,
+          label: lockedCriteria.label,
+          locationIds: [],
+          shiftTypeIds: [],
+          weekdayConditions: [],
+          isWeekendOnly: false
+        }}
+      />
+    );
+
+    expect(
+      screen.getByText(
+        "This criteria is locked. Unlock it before editing the rule, changing its active status, or deleting it."
+      )
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("Code")).toBeDisabled();
+    expect(screen.getByLabelText("Label")).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Save Changes" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Deactivate" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Delete" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Unlock Criteria" })).toBeEnabled();
   });
 });

@@ -8,6 +8,9 @@ import {
 function cloneBiasCriteria(criteria: BiasCriteria): BiasCriteria {
   return {
     ...criteria,
+    isLocked: criteria.isLocked ?? false,
+    lockedAt: criteria.lockedAt,
+    lockedByActorId: criteria.lockedByActorId,
     locationIds: [...criteria.locationIds],
     shiftTypeIds: [...criteria.shiftTypeIds],
     weekdayConditions: [...criteria.weekdayConditions]
@@ -40,6 +43,9 @@ export class InMemoryBiasCriteriaRepository implements BiasCriteriaRepository {
     const nextCriteria: BiasCriteria = {
       ...criteria,
       id: criteria.id || crypto.randomUUID(),
+      isLocked: criteria.isLocked ?? false,
+      lockedAt: criteria.lockedAt,
+      lockedByActorId: criteria.lockedByActorId,
       createdAt: criteria.createdAt || timestamp,
       updatedAt: timestamp
     };
@@ -65,6 +71,15 @@ export class InMemoryBiasCriteriaRepository implements BiasCriteriaRepository {
       id: existingCriteria.id,
       createdAt: existingCriteria.createdAt,
       createdByActorId: existingCriteria.createdByActorId,
+      isLocked: changes.isLocked ?? existingCriteria.isLocked ?? false,
+      lockedAt:
+        changes.isLocked === false
+          ? undefined
+          : (changes.lockedAt ?? existingCriteria.lockedAt),
+      lockedByActorId:
+        changes.isLocked === false
+          ? undefined
+          : (changes.lockedByActorId ?? existingCriteria.lockedByActorId),
       updatedAt: changes.updatedAt ?? new Date().toISOString()
     };
 

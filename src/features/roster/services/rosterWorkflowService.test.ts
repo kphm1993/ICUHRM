@@ -64,6 +64,7 @@ function createCriteriaFixtures(): ReadonlyArray<BiasCriteria> {
       weekdayConditions: [],
       isWeekendOnly: false,
       isActive: true,
+      isLocked: false,
       createdAt: "2026-04-03T08:00:00.000Z",
       updatedAt: "2026-04-03T08:00:00.000Z",
       createdByActorId: ACTOR_ID,
@@ -78,6 +79,7 @@ function createCriteriaFixtures(): ReadonlyArray<BiasCriteria> {
       weekdayConditions: [],
       isWeekendOnly: false,
       isActive: true,
+      isLocked: false,
       createdAt: "2026-04-03T08:00:00.000Z",
       updatedAt: "2026-04-03T08:00:00.000Z",
       createdByActorId: ACTOR_ID,
@@ -126,6 +128,7 @@ function createWorkflowHarness(options?: {
   const biasCriteriaManagementService = createBiasCriteriaManagementService({
     biasCriteriaRepository,
     biasLedgerRepository,
+    doctorRepository,
     rosterSnapshotRepository,
     auditLogService
   });
