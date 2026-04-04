@@ -4,6 +4,9 @@ import {
   ROSTER_SEED_BIAS_CRITERIA,
   ROSTER_SEED_BIAS_LEDGERS,
   ROSTER_SEED_DOCTORS,
+  ROSTER_SEED_DOCTOR_GROUPS,
+  ROSTER_SEED_DUTY_DESIGNS,
+  ROSTER_SEED_DUTY_DESIGN_ASSIGNMENTS,
   ROSTER_SEED_DUTY_LOCATIONS,
   ROSTER_SEED_LEAVES,
   ROSTER_SEED_OFF_REQUESTS,
@@ -14,24 +17,32 @@ import {
 import { createBiasCriteriaManagementService } from "@/features/admin/services/biasCriteriaManagementService";
 import { createDutyLocationManagementService } from "@/features/admin/services/dutyLocationManagementService";
 import { createAuditLogService } from "@/features/audit/services/auditLogService";
+import { createDoctorGroupManagementService } from "@/features/doctors/services/doctorGroupManagementService";
 import { createDoctorManagementService } from "@/features/doctors/services/doctorManagementService";
+import { createDutyDesignAssignmentService } from "@/features/dutyDesigns/services/dutyDesignAssignmentService";
+import { createDutyDesignManagementService } from "@/features/dutyDesigns/services/dutyDesignManagementService";
 import { createBiasManagementService } from "@/features/fairness/services/biasManagementService";
 import { createLeaveManagementService } from "@/features/leaves/services/leaveManagementService";
 import { createOffRequestService } from "@/features/offRequests/services/offRequestService";
 import { createRosterWorkflowService } from "@/features/roster/services/rosterWorkflowService";
+import { createRosterWizardService } from "@/features/roster/services/rosterWizardService";
 import { createShiftTypeManagementService } from "@/features/shifts/services/shiftTypeManagementService";
 import {
-  InMemoryLeaveRepository,
-  InMemoryShiftTypeRepository
+  InMemoryLeaveRepository
 } from "@/infrastructure/repositories/inMemory";
 import {
   LocalStorageAuditLogRepository,
   LocalStorageBiasCriteriaRepository,
   LocalStorageBiasLedgerRepository,
   LocalStorageDoctorRepository,
+  LocalStorageDoctorGroupRepository,
+  LocalStorageDutyDesignAssignmentRepository,
+  LocalStorageDutyDesignRepository,
   LocalStorageDutyLocationRepository,
   LocalStorageOffRequestRepository,
   LocalStorageRosterSnapshotRepository,
+  LocalStorageRosterWizardDraftRepository,
+  LocalStorageShiftTypeRepository,
   LocalStorageWeekdayPairBiasLedgerRepository
 } from "@/infrastructure/repositories/browserStorage";
 
@@ -42,12 +53,22 @@ export interface AppServices {
     typeof createBiasCriteriaManagementService
   >;
   readonly doctorManagementService: ReturnType<typeof createDoctorManagementService>;
+  readonly doctorGroupManagementService: ReturnType<
+    typeof createDoctorGroupManagementService
+  >;
+  readonly dutyDesignAssignmentService: ReturnType<
+    typeof createDutyDesignAssignmentService
+  >;
+  readonly dutyDesignManagementService: ReturnType<
+    typeof createDutyDesignManagementService
+  >;
   readonly dutyLocationManagementService: ReturnType<
     typeof createDutyLocationManagementService
   >;
   readonly leaveManagementService: ReturnType<typeof createLeaveManagementService>;
   readonly offRequestService: ReturnType<typeof createOffRequestService>;
   readonly rosterWorkflowService: ReturnType<typeof createRosterWorkflowService>;
+  readonly rosterWizardService: ReturnType<typeof createRosterWizardService>;
   readonly shiftTypeManagementService: ReturnType<typeof createShiftTypeManagementService>;
 }
 
@@ -56,14 +77,26 @@ function createAppRepositories() {
     doctorRepository: new LocalStorageDoctorRepository({
       seedData: ROSTER_SEED_DOCTORS
     }),
+    doctorGroupRepository: new LocalStorageDoctorGroupRepository({
+      seedData: ROSTER_SEED_DOCTOR_GROUPS
+    }),
+    shiftTypeRepository: new LocalStorageShiftTypeRepository({
+      seedData: ROSTER_SEED_SHIFT_TYPES
+    }),
     dutyLocationRepository: new LocalStorageDutyLocationRepository({
       seedData: ROSTER_SEED_DUTY_LOCATIONS
     }),
     biasCriteriaRepository: new LocalStorageBiasCriteriaRepository({
       seedData: ROSTER_SEED_BIAS_CRITERIA
     }),
+    dutyDesignRepository: new LocalStorageDutyDesignRepository({
+      seedData: ROSTER_SEED_DUTY_DESIGNS
+    }),
+    dutyDesignAssignmentRepository: new LocalStorageDutyDesignAssignmentRepository({
+      seedData: ROSTER_SEED_DUTY_DESIGN_ASSIGNMENTS
+    }),
+    rosterWizardDraftRepository: new LocalStorageRosterWizardDraftRepository(),
     leaveRepository: new InMemoryLeaveRepository(ROSTER_SEED_LEAVES),
-    shiftTypeRepository: new InMemoryShiftTypeRepository(ROSTER_SEED_SHIFT_TYPES),
     rosterSnapshotRepository: new LocalStorageRosterSnapshotRepository({
       seedData: ROSTER_SEED_ROSTER_SNAPSHOTS
     }),
@@ -103,6 +136,7 @@ function createAppServices(): AppServices {
   });
   const doctorManagementService = createDoctorManagementService({
     doctorRepository: repositories.doctorRepository,
+    doctorGroupRepository: repositories.doctorGroupRepository,
     leaveRepository: repositories.leaveRepository,
     offRequestRepository: repositories.offRequestRepository,
     biasLedgerRepository: repositories.biasLedgerRepository,
@@ -110,11 +144,32 @@ function createAppServices(): AppServices {
     rosterSnapshotRepository: repositories.rosterSnapshotRepository,
     auditLogService
   });
+  const dutyDesignManagementService = createDutyDesignManagementService({
+    dutyDesignRepository: repositories.dutyDesignRepository,
+    dutyDesignAssignmentRepository: repositories.dutyDesignAssignmentRepository,
+    shiftTypeRepository: repositories.shiftTypeRepository,
+    dutyLocationRepository: repositories.dutyLocationRepository,
+    rosterSnapshotRepository: repositories.rosterSnapshotRepository,
+    auditLogService
+  });
+  const dutyDesignAssignmentService = createDutyDesignAssignmentService({
+    dutyDesignAssignmentRepository: repositories.dutyDesignAssignmentRepository,
+    dutyDesignRepository: repositories.dutyDesignRepository,
+    auditLogService
+  });
   const leaveManagementService = createLeaveManagementService({
     leaveRepository: repositories.leaveRepository
   });
+  const doctorGroupManagementService = createDoctorGroupManagementService({
+    doctorGroupRepository: repositories.doctorGroupRepository,
+    auditLogService
+  });
   const shiftTypeManagementService = createShiftTypeManagementService({
-    shiftTypeRepository: repositories.shiftTypeRepository
+    shiftTypeRepository: repositories.shiftTypeRepository,
+    dutyDesignRepository: repositories.dutyDesignRepository,
+    biasCriteriaRepository: repositories.biasCriteriaRepository,
+    rosterSnapshotRepository: repositories.rosterSnapshotRepository,
+    auditLogService
   });
   const offRequestService = createOffRequestService({
     offRequestRepository: repositories.offRequestRepository,
@@ -127,7 +182,10 @@ function createAppServices(): AppServices {
   });
   const rosterWorkflowService = createRosterWorkflowService({
     biasCriteriaManagementService,
+    doctorGroupManagementService,
     doctorManagementService,
+    dutyDesignManagementService,
+    dutyDesignAssignmentService,
     dutyLocationManagementService,
     leaveManagementService,
     shiftTypeManagementService,
@@ -138,16 +196,25 @@ function createAppServices(): AppServices {
     rosterSnapshotRepository: repositories.rosterSnapshotRepository,
     auditLogService
   });
+  const rosterWizardService = createRosterWizardService({
+    rosterWizardDraftRepository: repositories.rosterWizardDraftRepository,
+    biasManagementService,
+    auditLogService
+  });
 
   return {
     auditLogService,
     biasManagementService,
     biasCriteriaManagementService,
+    doctorGroupManagementService,
     doctorManagementService,
+    dutyDesignAssignmentService,
+    dutyDesignManagementService,
     dutyLocationManagementService,
     leaveManagementService,
     offRequestService,
     rosterWorkflowService,
+    rosterWizardService,
     shiftTypeManagementService
   };
 }

@@ -1,8 +1,11 @@
 import {
   CriteriaLockedError,
   CriteriaInUseError,
+  EntityInUseError,
   LocationInUseError,
   NoCriteriaDefinedError,
+  RepositoryConflictError,
+  RepositoryNotFoundError,
   RosterDeletionError,
   UnauthorizedError
 } from "@/domain/repositories";
@@ -38,12 +41,24 @@ export function getAdminOperationErrorMessage(
     return error.message;
   }
 
+  if (error instanceof EntityInUseError) {
+    return `${error.message} Remove the dependent configuration first, then try again.`;
+  }
+
   if (error instanceof RosterDeletionError) {
     return error.message;
   }
 
   if (error instanceof UnauthorizedError) {
-    return "You do not have permission to manage roster lifecycle.";
+    return error.message;
+  }
+
+  if (error instanceof RepositoryNotFoundError) {
+    return error.message;
+  }
+
+  if (error instanceof RepositoryConflictError) {
+    return error.message;
   }
 
   if (!(error instanceof Error)) {

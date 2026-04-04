@@ -70,6 +70,6 @@ describe("getAdminOperationErrorMessage", () => {
         new UnauthorizedError("Only admins can manage roster lifecycle."),
         "Fallback."
       )
-    ).toContain("do not have permission");
+    ).toBe("Only admins can manage roster lifecycle.");
   });
 });

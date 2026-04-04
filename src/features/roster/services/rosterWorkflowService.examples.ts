@@ -5,7 +5,10 @@ import { createDutyLocationManagementService } from "@/features/admin/services/d
 import { createRosterWorkflowService } from "@/features/roster/services/rosterWorkflowService";
 import { createAuditLogService } from "@/features/audit/services/auditLogService";
 import { createBiasManagementService } from "@/features/fairness/services/biasManagementService";
+import { createDoctorGroupManagementService } from "@/features/doctors/services/doctorGroupManagementService";
 import { createDoctorManagementService } from "@/features/doctors/services/doctorManagementService";
+import { createDutyDesignAssignmentService } from "@/features/dutyDesigns/services/dutyDesignAssignmentService";
+import { createDutyDesignManagementService } from "@/features/dutyDesigns/services/dutyDesignManagementService";
 import { createLeaveManagementService } from "@/features/leaves/services/leaveManagementService";
 import { createOffRequestService } from "@/features/offRequests/services/offRequestService";
 import { createShiftTypeManagementService } from "@/features/shifts/services/shiftTypeManagementService";
@@ -13,6 +16,7 @@ import {
   ROSTER_SEED_BIAS_LEDGERS,
   ROSTER_SEED_DUTY_LOCATIONS,
   ROSTER_SEED_DOCTORS,
+  ROSTER_SEED_DOCTOR_GROUPS,
   ROSTER_SEED_LEAVES,
   ROSTER_SEED_OFF_REQUESTS,
   ROSTER_SEED_SHIFT_TYPES,
@@ -22,6 +26,9 @@ import {
   InMemoryBiasCriteriaRepository,
   InMemoryBiasLedgerRepository,
   InMemoryDoctorRepository,
+  InMemoryDoctorGroupRepository,
+  InMemoryDutyDesignAssignmentRepository,
+  InMemoryDutyDesignRepository,
   InMemoryDutyLocationRepository,
   InMemoryLeaveRepository,
   InMemoryShiftTypeRepository,
@@ -96,6 +103,9 @@ function createExampleWorkflow(storageKeyPrefix: string) {
     EXAMPLE_BIAS_CRITERIA
   );
   const doctorRepository = new InMemoryDoctorRepository(ROSTER_SEED_DOCTORS);
+  const doctorGroupRepository = new InMemoryDoctorGroupRepository(
+    ROSTER_SEED_DOCTOR_GROUPS
+  );
   const dutyLocationRepository = new InMemoryDutyLocationRepository(
     ROSTER_SEED_DUTY_LOCATIONS
   );
@@ -112,11 +122,32 @@ function createExampleWorkflow(storageKeyPrefix: string) {
     rosterSnapshotRepository,
     auditLogService
   });
+  const dutyDesignRepository = new InMemoryDutyDesignRepository();
+  const dutyDesignAssignmentRepository =
+    new InMemoryDutyDesignAssignmentRepository();
+  const dutyDesignManagementService = createDutyDesignManagementService({
+    dutyDesignRepository,
+    dutyDesignAssignmentRepository,
+    shiftTypeRepository: new InMemoryShiftTypeRepository(ROSTER_SEED_SHIFT_TYPES),
+    dutyLocationRepository,
+    rosterSnapshotRepository,
+    auditLogService
+  });
+  const dutyDesignAssignmentService = createDutyDesignAssignmentService({
+    dutyDesignAssignmentRepository,
+    dutyDesignRepository,
+    auditLogService
+  });
+  const doctorGroupManagementService = createDoctorGroupManagementService({
+    doctorGroupRepository,
+    auditLogService
+  });
 
   const workflowService = createRosterWorkflowService({
     biasCriteriaManagementService,
     doctorManagementService: createDoctorManagementService({
       doctorRepository,
+      doctorGroupRepository,
       leaveRepository: new InMemoryLeaveRepository(ROSTER_SEED_LEAVES),
       offRequestRepository,
       biasLedgerRepository: new InMemoryBiasLedgerRepository(ROSTER_SEED_BIAS_LEDGERS),
@@ -126,12 +157,19 @@ function createExampleWorkflow(storageKeyPrefix: string) {
       rosterSnapshotRepository,
       auditLogService
     }),
+    doctorGroupManagementService,
+    dutyDesignManagementService,
+    dutyDesignAssignmentService,
     dutyLocationManagementService,
     leaveManagementService: createLeaveManagementService({
       leaveRepository: new InMemoryLeaveRepository(ROSTER_SEED_LEAVES)
     }),
     shiftTypeManagementService: createShiftTypeManagementService({
-      shiftTypeRepository: new InMemoryShiftTypeRepository(ROSTER_SEED_SHIFT_TYPES)
+      shiftTypeRepository: new InMemoryShiftTypeRepository(ROSTER_SEED_SHIFT_TYPES),
+      dutyDesignRepository,
+      biasCriteriaRepository,
+      rosterSnapshotRepository,
+      auditLogService
     }),
     offRequestService: createOffRequestService({
       offRequestRepository,
@@ -170,7 +208,6 @@ export async function runRosterWorkflowSmokeExample(
   try {
     const draft = await workflowService.generateDraft({
       rosterMonth: "2026-04",
-      firstWeekendOffGroup: "A",
       actorId,
       actorRole
     });
@@ -185,8 +222,7 @@ export async function runRosterWorkflowSmokeExample(
       actorRole
     });
     const monthContext = await workflowService.getMonthContext({
-      rosterMonth: "2026-04",
-      firstWeekendOffGroup: "A"
+      rosterMonth: "2026-04"
     });
 
     return {

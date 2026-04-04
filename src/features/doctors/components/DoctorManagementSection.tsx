@@ -1,5 +1,5 @@
-import { DoctorEditorForm } from "@/features/doctors/components/DoctorEditorForm";
-import { DoctorList } from "@/features/doctors/components/DoctorList";
+import { DoctorEditorDialog } from "@/features/doctors/components/DoctorEditorDialog";
+import { DoctorGroupedList } from "@/features/doctors/components/DoctorGroupedList";
 import { useDoctorManagement } from "@/features/doctors/hooks/useDoctorManagement";
 
 type DoctorManagementSectionProps = {
@@ -22,9 +22,8 @@ export function DoctorManagementSection({
             Doctor Management
           </h1>
           <p className="mt-3 max-w-3xl text-sm text-slate-600 sm:text-base">
-            Maintain the doctor roster base data, weekend-group assignment, and active
-            status without bypassing persistence, audit logging, or historical roster
-            safety.
+            Maintain doctor base data, reusable group assignment, and active status
+            without bypassing persistence, audit logging, or historical roster safety.
           </p>
         </header>
       ) : null}
@@ -41,27 +40,30 @@ export function DoctorManagementSection({
         </div>
       ) : null}
 
-      <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
-        <DoctorList
+      <DoctorGroupedList
           doctors={doctorManagement.doctors}
+          doctorGroups={doctorManagement.doctorGroups}
           selectedDoctorId={doctorManagement.selectedDoctorId}
           isLoading={doctorManagement.isLoading}
-          onCreateDoctor={doctorManagement.beginCreateDoctor}
-          onSelectDoctor={doctorManagement.beginEditDoctor}
-        />
+          onCreateDoctor={doctorManagement.openCreateDoctor}
+          onEditSelected={doctorManagement.openEditDoctor}
+          onSelectDoctor={doctorManagement.selectDoctor}
+      />
 
-        <DoctorEditorForm
+      <DoctorEditorDialog
+          isOpen={doctorManagement.isEditorOpen}
           mode={doctorManagement.formMode}
           doctor={doctorManagement.selectedDoctor}
+          doctorGroups={doctorManagement.doctorGroups}
           values={doctorManagement.formValues}
           activeAction={doctorManagement.activeAction}
           onChange={doctorManagement.updateFormValue}
+          onClose={doctorManagement.closeEditor}
+          onCreateGroup={doctorManagement.createGroupFromForm}
           onSubmit={doctorManagement.saveDoctor}
-          onCancel={doctorManagement.cancelEditing}
           onDelete={doctorManagement.deleteDoctor}
           onToggleStatus={doctorManagement.toggleDoctorStatus}
         />
-      </div>
     </section>
   );
 }

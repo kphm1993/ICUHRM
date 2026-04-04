@@ -15,7 +15,11 @@ import {
 } from "@/infrastructure/repositories/browserStorage/storage";
 
 function cloneDoctor(doctor: Doctor): Doctor {
-  return { ...doctor };
+  return {
+    ...doctor,
+    groupId: doctor.groupId,
+    weekendGroup: undefined
+  };
 }
 
 function sortDoctors(doctors: ReadonlyArray<Doctor>): ReadonlyArray<Doctor> {
@@ -41,6 +45,10 @@ export class LocalStorageDoctorRepository implements DoctorRepository {
       }
 
       if (filter?.userId !== undefined && doctor.userId !== filter.userId) {
+        return false;
+      }
+
+      if (filter?.groupId !== undefined && doctor.groupId !== filter.groupId) {
         return false;
       }
 
@@ -76,13 +84,19 @@ export class LocalStorageDoctorRepository implements DoctorRepository {
 
   async save(doctor: Doctor): Promise<Doctor> {
     const entries = this.readEntries();
-    this.assertUniqueConstraints(doctor, entries);
+    const normalizedDoctor = {
+      ...doctor,
+      groupId: doctor.groupId,
+      weekendGroup: undefined
+    } satisfies Doctor;
 
-    const nextEntries = entries.filter((entry) => entry.id !== doctor.id);
-    nextEntries.push(cloneDoctor(doctor));
+    this.assertUniqueConstraints(normalizedDoctor, entries);
+
+    const nextEntries = entries.filter((entry) => entry.id !== normalizedDoctor.id);
+    nextEntries.push(cloneDoctor(normalizedDoctor));
     this.writeEntries(nextEntries);
 
-    return cloneDoctor(doctor);
+    return cloneDoctor(normalizedDoctor);
   }
 
   async delete(id: string): Promise<void> {
@@ -97,7 +111,13 @@ export class LocalStorageDoctorRepository implements DoctorRepository {
   }
 
   private readEntries(): Doctor[] {
-    return readCollectionFromStorage(this.storageKey, this.seedData).map(cloneDoctor);
+    return readCollectionFromStorage(this.storageKey, this.seedData).map((entry) =>
+      cloneDoctor({
+        ...entry,
+        groupId: entry.groupId,
+        weekendGroup: undefined
+      } as Doctor)
+    );
   }
 
   private writeEntries(entries: ReadonlyArray<Doctor>): void {

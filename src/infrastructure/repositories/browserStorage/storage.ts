@@ -1,7 +1,12 @@
 export const STORAGE_KEYS = {
   doctors: "icu-hrm:v1:doctors",
+  doctorGroups: "icu-hrm:v1:doctor-groups",
+  shiftTypes: "icu-hrm:v1:shift-types",
   dutyLocations: "icu-hrm:v1:duty-locations",
   biasCriteria: "icu-hrm:v1:bias-criteria",
+  dutyDesigns: "icu-hrm:v1:duty-designs",
+  dutyDesignAssignments: "icu-hrm:v1:duty-design-assignments",
+  rosterWizardDrafts: "icu-hrm:v1:roster-wizard-drafts",
   rosterSnapshots: "icu-hrm:v1:roster-snapshots",
   auditLogs: "icu-hrm:v1:audit-logs",
   offRequests: "icu-hrm:v1:off-requests",

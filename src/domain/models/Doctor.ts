@@ -10,9 +10,9 @@ export interface Doctor {
   readonly name: string;
   readonly phoneNumber: string;
   readonly uniqueIdentifier: string;
-  readonly weekendGroup: WeekendGroup;
+  readonly groupId?: EntityId;
+  readonly weekendGroup?: WeekendGroup;
   readonly isActive: boolean;
   readonly createdAt: ISODateTimeString;
   readonly updatedAt: ISODateTimeString;
 }
-

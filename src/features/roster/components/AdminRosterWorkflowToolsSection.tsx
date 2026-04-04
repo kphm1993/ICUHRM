@@ -1,5 +1,5 @@
 import { useAdminRosterWorkflow } from "@/features/roster/hooks/useAdminRosterWorkflow";
-import { RosterGenerationPanel } from "@/features/roster/components/RosterGenerationPanel";
+import { RosterDraftGenerationPanel } from "@/features/roster/components/RosterDraftGenerationPanel";
 import { RosterLifecycleActions } from "@/features/roster/components/RosterLifecycleActions";
 
 type AdminRosterWorkflowToolsSectionProps = {
@@ -60,15 +60,22 @@ export function AdminRosterWorkflowToolsSection({
         </div>
       ) : null}
 
-      <RosterGenerationPanel
+      <RosterDraftGenerationPanel
         selectedMonth={workflow.selectedMonth}
         onSelectedMonthChange={workflow.setSelectedMonth}
-        firstWeekendOffGroup={workflow.firstWeekendOffGroup}
-        onFirstWeekendOffGroupChange={workflow.setFirstWeekendOffGroup}
         notes={workflow.notes}
         onNotesChange={workflow.setNotes}
         sourceSummary={workflow.monthContext?.sourceSummary ?? null}
         shiftTypes={workflow.monthContext?.shiftTypes ?? []}
+        doctorGroups={workflow.monthContext?.doctorGroups ?? []}
+        allowedDoctorGroupIdByDate={workflow.allowedDoctorGroupIdByDate}
+        selectedConstraintDates={workflow.selectedConstraintDates}
+        selectedConstraintGroupId={workflow.selectedConstraintGroupId}
+        onToggleConstraintDate={workflow.toggleConstraintDate}
+        onClearSelectedConstraintDates={workflow.clearSelectedConstraintDates}
+        onSelectedConstraintGroupIdChange={workflow.setSelectedConstraintGroupId}
+        onApplySelectedGroupConstraint={workflow.applySelectedGroupConstraint}
+        onClearDateConstraint={workflow.clearConstraintForDate}
         isGenerating={workflow.activeAction === "generate"}
         onGenerate={workflow.generateDraft}
         canGenerate={canGenerate}

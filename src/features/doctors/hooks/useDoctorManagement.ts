@@ -1,8 +1,5 @@
 import { useEffect, useState } from "react";
-import type {
-  Doctor,
-  WeekendGroup
-} from "@/domain/models";
+import type { Doctor, DoctorGroup } from "@/domain/models";
 import { useAppServices } from "@/app/providers/useAppServices";
 import { useAuth } from "@/features/auth/context/AuthContext";
 
@@ -10,19 +7,21 @@ export interface DoctorFormValues {
   readonly name: string;
   readonly phoneNumber: string;
   readonly uniqueIdentifier: string;
-  readonly weekendGroup: WeekendGroup;
+  readonly groupId: string;
+  readonly newGroupName: string;
   readonly temporaryPassword: string;
 }
 
 type FormMode = "create" | "edit";
-type DoctorAction = "save" | "delete" | "status" | null;
+type DoctorAction = "save" | "delete" | "status" | "group" | null;
 
 function createEmptyDoctorFormValues(): DoctorFormValues {
   return {
     name: "",
     phoneNumber: "",
     uniqueIdentifier: "",
-    weekendGroup: "A",
+    groupId: "",
+    newGroupName: "",
     temporaryPassword: ""
   };
 }
@@ -32,16 +31,19 @@ function createDoctorFormValuesFromDoctor(doctor: Doctor): DoctorFormValues {
     name: doctor.name,
     phoneNumber: doctor.phoneNumber,
     uniqueIdentifier: doctor.uniqueIdentifier,
-    weekendGroup: doctor.weekendGroup,
+    groupId: doctor.groupId ?? "",
+    newGroupName: "",
     temporaryPassword: ""
   };
 }
 
 export function useDoctorManagement() {
-  const { doctorManagementService } = useAppServices();
+  const { doctorManagementService, doctorGroupManagementService } = useAppServices();
   const { user, role } = useAuth();
   const [doctors, setDoctors] = useState<ReadonlyArray<Doctor>>([]);
+  const [doctorGroups, setDoctorGroups] = useState<ReadonlyArray<DoctorGroup>>([]);
   const [selectedDoctorId, setSelectedDoctorId] = useState<string | null>(null);
+  const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [formMode, setFormMode] = useState<FormMode>("create");
   const [formValues, setFormValues] = useState<DoctorFormValues>(
     createEmptyDoctorFormValues()
@@ -54,13 +56,18 @@ export function useDoctorManagement() {
   const selectedDoctor =
     doctors.find((doctor) => doctor.id === selectedDoctorId) ?? null;
 
-  async function loadDoctors(nextSelectedDoctorId?: string | null) {
+  async function loadData(nextSelectedDoctorId?: string | null) {
     setIsLoading(true);
     setErrorMessage(null);
 
     try {
-      const nextDoctors = await doctorManagementService.listDoctors();
+      const [nextDoctors, nextDoctorGroups] = await Promise.all([
+        doctorManagementService.listDoctors(),
+        doctorGroupManagementService.listDoctorGroups()
+      ]);
+
       setDoctors(nextDoctors);
+      setDoctorGroups(nextDoctorGroups);
 
       const resolvedSelectedDoctorId =
         nextSelectedDoctorId === undefined ? selectedDoctorId : nextSelectedDoctorId;
@@ -69,14 +76,16 @@ export function useDoctorManagement() {
           ? null
           : nextDoctors.find((doctor) => doctor.id === resolvedSelectedDoctorId) ?? null;
 
-      if (nextSelectedDoctor) {
-        setSelectedDoctorId(nextSelectedDoctor.id);
-        setFormMode("edit");
-        setFormValues(createDoctorFormValuesFromDoctor(nextSelectedDoctor));
-      } else {
-        setSelectedDoctorId(null);
-        setFormMode("create");
-        setFormValues(createEmptyDoctorFormValues());
+      setSelectedDoctorId(nextSelectedDoctor?.id ?? null);
+
+      if (isEditorOpen && formMode === "edit") {
+        if (nextSelectedDoctor) {
+          setFormValues(createDoctorFormValuesFromDoctor(nextSelectedDoctor));
+        } else {
+          setIsEditorOpen(false);
+          setFormMode("create");
+          setFormValues(createEmptyDoctorFormValues());
+        }
       }
     } catch (error) {
       setErrorMessage(
@@ -88,30 +97,37 @@ export function useDoctorManagement() {
   }
 
   useEffect(() => {
-    void loadDoctors(null);
+    void loadData(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [doctorManagementService]);
+  }, [doctorManagementService, doctorGroupManagementService]);
 
-  function beginCreateDoctor() {
+  function clearMessages() {
     setErrorMessage(null);
     setSuccessMessage(null);
-    setSelectedDoctorId(null);
-    setFormMode("create");
-    setFormValues(createEmptyDoctorFormValues());
   }
 
-  function beginEditDoctor(doctorId: string) {
-    const doctor = doctors.find((entry) => entry.id === doctorId);
+  function selectDoctor(doctorId: string) {
+    clearMessages();
+    setSelectedDoctorId(doctorId);
+  }
 
-    if (!doctor) {
+  function openCreateDoctor() {
+    clearMessages();
+    setFormMode("create");
+    setFormValues(createEmptyDoctorFormValues());
+    setIsEditorOpen(true);
+  }
+
+  function openEditDoctor() {
+    if (!selectedDoctor) {
+      setErrorMessage("Select a doctor before editing.");
       return;
     }
 
-    setErrorMessage(null);
-    setSuccessMessage(null);
-    setSelectedDoctorId(doctor.id);
+    clearMessages();
     setFormMode("edit");
-    setFormValues(createDoctorFormValuesFromDoctor(doctor));
+    setFormValues(createDoctorFormValuesFromDoctor(selectedDoctor));
+    setIsEditorOpen(true);
   }
 
   function updateFormValue<K extends keyof DoctorFormValues>(
@@ -124,18 +140,14 @@ export function useDoctorManagement() {
     }));
   }
 
-  function cancelEditing() {
-    setErrorMessage(null);
-    setSuccessMessage(null);
-
-    if (selectedDoctor) {
-      setFormMode("edit");
-      setFormValues(createDoctorFormValuesFromDoctor(selectedDoctor));
-      return;
-    }
-
-    setFormMode("create");
-    setFormValues(createEmptyDoctorFormValues());
+  function closeEditor() {
+    clearMessages();
+    setIsEditorOpen(false);
+    setFormValues(
+      selectedDoctor && formMode === "edit"
+        ? createDoctorFormValuesFromDoctor(selectedDoctor)
+        : createEmptyDoctorFormValues()
+    );
   }
 
   async function runAction(
@@ -143,8 +155,7 @@ export function useDoctorManagement() {
     work: () => Promise<void>
   ) {
     setActiveAction(action);
-    setErrorMessage(null);
-    setSuccessMessage(null);
+    clearMessages();
 
     try {
       await work();
@@ -157,6 +168,29 @@ export function useDoctorManagement() {
     }
   }
 
+  async function createGroupFromForm() {
+    if (!user || !role) {
+      setErrorMessage("Admin identity is required to manage doctor groups.");
+      return;
+    }
+
+    await runAction("group", async () => {
+      const savedGroup = await doctorGroupManagementService.createDoctorGroup({
+        name: formValues.newGroupName,
+        actorId: user.id,
+        actorRole: role
+      });
+
+      await loadData(selectedDoctorId);
+      setFormValues((currentValues) => ({
+        ...currentValues,
+        groupId: savedGroup.id,
+        newGroupName: ""
+      }));
+      setSuccessMessage(`Created group ${savedGroup.name}.`);
+    });
+  }
+
   async function saveDoctor() {
     if (!user || !role) {
       setErrorMessage("Admin identity is required to manage doctors.");
@@ -166,12 +200,18 @@ export function useDoctorManagement() {
     await runAction("save", async () => {
       if (formMode === "create") {
         const savedDoctor = await doctorManagementService.createDoctor({
-          ...formValues,
+          name: formValues.name,
+          phoneNumber: formValues.phoneNumber,
+          uniqueIdentifier: formValues.uniqueIdentifier,
+          groupId: formValues.groupId || undefined,
+          temporaryPassword: formValues.temporaryPassword,
           actorId: user.id,
           actorRole: role
         });
 
-        await loadDoctors(savedDoctor.id);
+        await loadData(savedDoctor.id);
+        setIsEditorOpen(false);
+        setFormValues(createEmptyDoctorFormValues());
         setSuccessMessage(`Created ${savedDoctor.name}.`);
         return;
       }
@@ -183,13 +223,18 @@ export function useDoctorManagement() {
       const updatedDoctor = await doctorManagementService.updateDoctor(
         selectedDoctor.id,
         {
-          ...formValues,
+          name: formValues.name,
+          phoneNumber: formValues.phoneNumber,
+          uniqueIdentifier: formValues.uniqueIdentifier,
+          groupId: formValues.groupId || undefined,
+          temporaryPassword: formValues.temporaryPassword || undefined,
           actorId: user.id,
           actorRole: role
         }
       );
 
-      await loadDoctors(updatedDoctor.id);
+      await loadData(updatedDoctor.id);
+      setIsEditorOpen(false);
       setSuccessMessage(`Updated ${updatedDoctor.name}.`);
     });
   }
@@ -211,7 +256,8 @@ export function useDoctorManagement() {
             actorRole: role
           });
 
-      await loadDoctors(updatedDoctor.id);
+      await loadData(updatedDoctor.id);
+      setIsEditorOpen(false);
       setSuccessMessage(
         updatedDoctor.isActive
           ? `${updatedDoctor.name} is now active.`
@@ -232,25 +278,30 @@ export function useDoctorManagement() {
         actorRole: role
       });
       const deletedDoctorName = selectedDoctor.name;
-      await loadDoctors(null);
+      await loadData(null);
+      setIsEditorOpen(false);
       setSuccessMessage(`Deleted ${deletedDoctorName}.`);
     });
   }
 
   return {
     doctors,
+    doctorGroups,
     selectedDoctor,
     selectedDoctorId,
+    isEditorOpen,
     formMode,
     formValues,
     isLoading,
     activeAction,
     errorMessage,
     successMessage,
-    beginCreateDoctor,
-    beginEditDoctor,
+    selectDoctor,
+    openCreateDoctor,
+    openEditDoctor,
     updateFormValue,
-    cancelEditing,
+    closeEditor,
+    createGroupFromForm,
     saveDoctor,
     toggleDoctorStatus,
     deleteDoctor

@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it } from "vitest";
-import type { ActorRole, BiasCriteria, DutyLocation } from "@/domain/models";
+import type {
+  ActorRole,
+  BiasCriteria,
+  DutyDesign,
+  DutyDesignAssignment,
+  DutyLocation
+} from "@/domain/models";
 import { DEFAULT_DUTY_LOCATION_ID } from "@/domain/models";
 import {
   CriteriaInUseError,
@@ -10,12 +16,16 @@ import {
 } from "@/domain/repositories";
 import {
   ROSTER_SEED_DOCTORS,
+  ROSTER_SEED_DOCTOR_GROUPS,
   ROSTER_SEED_SHIFT_TYPES
 } from "@/app/seed/rosterSeedData";
 import { createBiasCriteriaManagementService } from "@/features/admin/services/biasCriteriaManagementService";
 import { createDutyLocationManagementService } from "@/features/admin/services/dutyLocationManagementService";
 import { createAuditLogService } from "@/features/audit/services/auditLogService";
+import { createDoctorGroupManagementService } from "@/features/doctors/services/doctorGroupManagementService";
 import { createDoctorManagementService } from "@/features/doctors/services/doctorManagementService";
+import { createDutyDesignAssignmentService } from "@/features/dutyDesigns/services/dutyDesignAssignmentService";
+import { createDutyDesignManagementService } from "@/features/dutyDesigns/services/dutyDesignManagementService";
 import { createBiasManagementService } from "@/features/fairness/services/biasManagementService";
 import { createLeaveManagementService } from "@/features/leaves/services/leaveManagementService";
 import { createOffRequestService } from "@/features/offRequests/services/offRequestService";
@@ -25,6 +35,9 @@ import {
   InMemoryBiasCriteriaRepository,
   InMemoryBiasLedgerRepository,
   InMemoryDoctorRepository,
+  InMemoryDoctorGroupRepository,
+  InMemoryDutyDesignAssignmentRepository,
+  InMemoryDutyDesignRepository,
   InMemoryDutyLocationRepository,
   InMemoryLeaveRepository,
   InMemoryShiftTypeRepository,
@@ -88,6 +101,39 @@ function createCriteriaFixtures(): ReadonlyArray<BiasCriteria> {
   ];
 }
 
+function createDutyDesign(overrides: Partial<DutyDesign> = {}): DutyDesign {
+  return {
+    id: overrides.id ?? "design-weekday",
+    code: overrides.code ?? "WEEKDAY",
+    label: overrides.label ?? "Weekday Design",
+    description: overrides.description,
+    isActive: overrides.isActive ?? true,
+    isHolidayDesign: overrides.isHolidayDesign ?? false,
+    dutyBlocks: overrides.dutyBlocks ?? [
+      {
+        shiftTypeId: "shift-type-day",
+        locationId: DEFAULT_DUTY_LOCATION_ID,
+        doctorCount: 1
+      }
+    ],
+    createdAt: overrides.createdAt ?? "2026-04-03T08:00:00.000Z",
+    updatedAt: overrides.updatedAt ?? "2026-04-03T08:00:00.000Z"
+  };
+}
+
+function createDutyDesignAssignment(
+  overrides: Partial<DutyDesignAssignment> = {}
+): DutyDesignAssignment {
+  return {
+    id: overrides.id ?? crypto.randomUUID(),
+    date: overrides.date ?? "2026-05-10",
+    dutyDesignId: overrides.dutyDesignId ?? "design-weekday",
+    isHolidayOverride: overrides.isHolidayOverride ?? false,
+    createdAt: overrides.createdAt ?? "2026-04-03T08:00:00.000Z",
+    updatedAt: overrides.updatedAt ?? "2026-04-03T08:00:00.000Z"
+  };
+}
+
 function cloneValue<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
@@ -95,6 +141,8 @@ function cloneValue<T>(value: T): T {
 function createWorkflowHarness(options?: {
   readonly criteria?: ReadonlyArray<BiasCriteria>;
   readonly locations?: ReadonlyArray<DutyLocation>;
+  readonly dutyDesigns?: ReadonlyArray<DutyDesign>;
+  readonly dutyDesignAssignments?: ReadonlyArray<DutyDesignAssignment>;
 }) {
   const storageKeyPrefix = `icu-hrm-phase4-${crypto.randomUUID()}`;
   const auditLogRepository = new LocalStorageAuditLogRepository({
@@ -109,6 +157,9 @@ function createWorkflowHarness(options?: {
   });
   const doctorRepository = new InMemoryDoctorRepository(
     ROSTER_SEED_DOCTORS.filter((doctor) => doctor.isActive)
+  );
+  const doctorGroupRepository = new InMemoryDoctorGroupRepository(
+    ROSTER_SEED_DOCTOR_GROUPS
   );
   const leaveRepository = new InMemoryLeaveRepository([]);
   const shiftTypeRepository = new InMemoryShiftTypeRepository(ROSTER_SEED_SHIFT_TYPES);
@@ -138,8 +189,33 @@ function createWorkflowHarness(options?: {
     rosterSnapshotRepository,
     auditLogService
   });
+  const dutyDesignRepository = new InMemoryDutyDesignRepository(
+    options?.dutyDesigns ?? []
+  );
+  const dutyDesignAssignmentRepository =
+    new InMemoryDutyDesignAssignmentRepository(
+      options?.dutyDesignAssignments ?? []
+    );
+  const dutyDesignManagementService = createDutyDesignManagementService({
+    dutyDesignRepository,
+    dutyDesignAssignmentRepository,
+    shiftTypeRepository,
+    dutyLocationRepository,
+    rosterSnapshotRepository,
+    auditLogService
+  });
+  const dutyDesignAssignmentService = createDutyDesignAssignmentService({
+    dutyDesignAssignmentRepository,
+    dutyDesignRepository,
+    auditLogService
+  });
+  const doctorGroupManagementService = createDoctorGroupManagementService({
+    doctorGroupRepository,
+    auditLogService
+  });
   const doctorManagementService = createDoctorManagementService({
     doctorRepository,
+    doctorGroupRepository,
     leaveRepository,
     offRequestRepository,
     biasLedgerRepository,
@@ -151,7 +227,11 @@ function createWorkflowHarness(options?: {
     leaveRepository
   });
   const shiftTypeManagementService = createShiftTypeManagementService({
-    shiftTypeRepository
+    shiftTypeRepository,
+    dutyDesignRepository,
+    biasCriteriaRepository,
+    rosterSnapshotRepository,
+    auditLogService
   });
   const offRequestService = createOffRequestService({
     offRequestRepository,
@@ -165,6 +245,9 @@ function createWorkflowHarness(options?: {
   const rosterWorkflowService = createRosterWorkflowService({
     biasCriteriaManagementService,
     doctorManagementService,
+    doctorGroupManagementService,
+    dutyDesignManagementService,
+    dutyDesignAssignmentService,
     dutyLocationManagementService,
     leaveManagementService,
     shiftTypeManagementService,
@@ -179,6 +262,7 @@ function createWorkflowHarness(options?: {
   return {
     auditLogService,
     biasCriteriaManagementService,
+    dutyDesignManagementService,
     dutyLocationManagementService,
     rosterSnapshotRepository,
     rosterWorkflowService,
@@ -201,7 +285,6 @@ describe("rosterWorkflowService", () => {
     try {
       const draft = await harness.rosterWorkflowService.generateDraft({
         rosterMonth: "2026-05",
-        firstWeekendOffGroup: "A",
         actorId: ACTOR_ID,
         actorRole: ACTOR_ROLE
       });
@@ -295,8 +378,13 @@ describe("rosterWorkflowService", () => {
         status: "DRAFT",
         activeCriteriaCount: 2,
         activeDutyLocationCount: 1,
-        generationLocationId: DEFAULT_DUTY_LOCATION_ID
+        fallbackLocationId: DEFAULT_DUTY_LOCATION_ID,
+        dutyDesignSnapshotCount: 0,
+        dutyDesignAssignmentCount: 0,
+        publicHolidayDateCount: 0
       });
+      expect(generatedLog?.details.dutyDesignAssignments).toEqual({});
+      expect(generatedLog?.details.dutyDesignSnapshot).toEqual({});
       expect(generatedLog?.details.activeBiasCriteria).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
@@ -337,7 +425,6 @@ describe("rosterWorkflowService", () => {
       await expect(
         harness.rosterWorkflowService.generateDraft({
           rosterMonth: "2026-05",
-          firstWeekendOffGroup: "A",
           actorId: ACTOR_ID,
           actorRole: ACTOR_ROLE
         })
@@ -347,7 +434,7 @@ describe("rosterWorkflowService", () => {
     }
   });
 
-  it("fails generation when multiple active locations are configured", async () => {
+  it("allows generation when multiple active locations are configured if the default location stays active", async () => {
     const harness = createWorkflowHarness({
       locations: [
         createDefaultLocation(),
@@ -360,16 +447,161 @@ describe("rosterWorkflowService", () => {
     });
 
     try {
+      const draft = await harness.rosterWorkflowService.generateDraft({
+        rosterMonth: "2026-05",
+        actorId: ACTOR_ID,
+        actorRole: ACTOR_ROLE
+      });
+
+      expect(draft.generatedInputSummary.activeDutyLocations).toHaveLength(2);
+      expect(draft.generatedInputSummary.fallbackLocationId).toBe(
+        DEFAULT_DUTY_LOCATION_ID
+      );
+      expect(
+        draft.generatedInputSummary.activeDutyLocations.map((location) => location.id)
+      ).toEqual(
+        expect.arrayContaining([
+          DEFAULT_DUTY_LOCATION_ID,
+          "duty-location-icu"
+        ])
+      );
+    } finally {
+      harness.cleanup();
+    }
+  });
+
+  it("fails generation when the default fallback location is not active", async () => {
+    const harness = createWorkflowHarness({
+      locations: [
+        createDefaultLocation({
+          isActive: false
+        }),
+        createDefaultLocation({
+          id: "duty-location-icu",
+          code: "ICU",
+          label: "Intensive Care Unit"
+        })
+      ]
+    });
+
+    try {
       await expect(
         harness.rosterWorkflowService.generateDraft({
           rosterMonth: "2026-05",
-          firstWeekendOffGroup: "A",
           actorId: ACTOR_ID,
           actorRole: ACTOR_ROLE
         })
       ).rejects.toThrow(
-        "Phase 3 roster generation requires exactly one active duty location."
+        `Roster generation requires the default duty location '${DEFAULT_DUTY_LOCATION_ID}' to be active.`
       );
+    } finally {
+      harness.cleanup();
+    }
+  });
+
+  it("preserves duty-design inputs in snapshots after publish-lock and later design edits", async () => {
+    const weekdayDesign = createDutyDesign();
+    const holidayDesign = createDutyDesign({
+      id: "design-holiday",
+      code: "HOLIDAY",
+      label: "Holiday Design",
+      isHolidayDesign: true,
+      dutyBlocks: [
+        {
+          shiftTypeId: "shift-type-night",
+          locationId: DEFAULT_DUTY_LOCATION_ID,
+          doctorCount: 1
+        }
+      ]
+    });
+    const harness = createWorkflowHarness({
+      dutyDesigns: [weekdayDesign, holidayDesign],
+      dutyDesignAssignments: [
+        createDutyDesignAssignment({
+          id: "assignment-standard",
+          date: "2026-05-10",
+          dutyDesignId: weekdayDesign.id,
+          isHolidayOverride: false
+        }),
+        createDutyDesignAssignment({
+          id: "assignment-holiday",
+          date: "2026-05-11",
+          dutyDesignId: holidayDesign.id,
+          isHolidayOverride: true
+        })
+      ]
+    });
+
+    try {
+      const publicHolidayDates = ["2026-05-11"] as const;
+      const draft = await harness.rosterWorkflowService.generateDraft({
+        rosterMonth: "2026-05",
+        publicHolidayDates,
+        actorId: ACTOR_ID,
+        actorRole: ACTOR_ROLE
+      });
+      const published = await harness.rosterWorkflowService.publishDraft({
+        draftRosterId: draft.roster.id,
+        actorId: ACTOR_ID,
+        actorRole: ACTOR_ROLE
+      });
+      const locked = await harness.rosterWorkflowService.lockPublishedRoster({
+        publishedRosterId: published.roster.id,
+        actorId: ACTOR_ID,
+        actorRole: ACTOR_ROLE
+      });
+
+      const publishedSummaryBeforeEdit = cloneValue(published.generatedInputSummary);
+      const lockedSummaryBeforeEdit = cloneValue(locked.generatedInputSummary);
+
+      await harness.dutyDesignManagementService.updateDutyDesign({
+        id: holidayDesign.id,
+        code: holidayDesign.code,
+        label: "Holiday Design Updated",
+        description: "Updated after roster publication.",
+        isActive: true,
+        isHolidayDesign: true,
+        dutyBlocks: holidayDesign.dutyBlocks,
+        actorId: ACTOR_ID,
+        actorRole: ACTOR_ROLE
+      });
+
+      const persistedPublishedSnapshot = await harness.rosterSnapshotRepository.findById(
+        published.roster.id
+      );
+      const persistedLockedSnapshot = await harness.rosterSnapshotRepository.findById(
+        locked.roster.id
+      );
+
+      expect(draft.generatedInputSummary.dutyDesignAssignments).toEqual({
+        "2026-05-10": {
+          standardDesignId: weekdayDesign.id
+        },
+        "2026-05-11": {
+          holidayOverrideDesignId: holidayDesign.id
+        }
+      });
+      expect(draft.generatedInputSummary.dutyDesignSnapshot).toEqual({
+        [weekdayDesign.id]: weekdayDesign,
+        [holidayDesign.id]: holidayDesign
+      });
+      expect(draft.generatedInputSummary.publicHolidayDates).toEqual(publicHolidayDates);
+      expect(persistedPublishedSnapshot?.generatedInputSummary).toEqual(
+        publishedSummaryBeforeEdit
+      );
+      expect(persistedLockedSnapshot?.generatedInputSummary).toEqual(
+        lockedSummaryBeforeEdit
+      );
+      expect(
+        persistedPublishedSnapshot?.generatedInputSummary.dutyDesignSnapshot[
+          holidayDesign.id
+        ]?.label
+      ).toBe("Holiday Design");
+      expect(
+        persistedLockedSnapshot?.generatedInputSummary.dutyDesignSnapshot[
+          holidayDesign.id
+        ]?.label
+      ).toBe("Holiday Design");
     } finally {
       harness.cleanup();
     }
@@ -381,7 +613,6 @@ describe("rosterWorkflowService", () => {
     try {
       const draft = await harness.rosterWorkflowService.generateDraft({
         rosterMonth: "2026-06",
-        firstWeekendOffGroup: "A",
         actorId: ACTOR_ID,
         actorRole: ACTOR_ROLE
       });
@@ -424,8 +655,7 @@ describe("rosterWorkflowService", () => {
         unlocked.roster.id
       );
       const monthContext = await harness.rosterWorkflowService.getMonthContext({
-        rosterMonth: "2026-06",
-        firstWeekendOffGroup: "A"
+        rosterMonth: "2026-06"
       });
       const rosterAuditLogs = await harness.auditLogService.listLogs({
         entityType: "ROSTER"
@@ -455,7 +685,6 @@ describe("rosterWorkflowService", () => {
     try {
       const draft = await harness.rosterWorkflowService.generateDraft({
         rosterMonth: "2026-07",
-        firstWeekendOffGroup: "A",
         actorId: ACTOR_ID,
         actorRole: ACTOR_ROLE
       });
@@ -476,7 +705,6 @@ describe("rosterWorkflowService", () => {
 
       const nextDraft = await harness.rosterWorkflowService.generateDraft({
         rosterMonth: "2026-08",
-        firstWeekendOffGroup: "A",
         actorId: ACTOR_ID,
         actorRole: ACTOR_ROLE
       });
@@ -501,8 +729,7 @@ describe("rosterWorkflowService", () => {
       });
 
       const monthContext = await harness.rosterWorkflowService.getMonthContext({
-        rosterMonth: "2026-08",
-        firstWeekendOffGroup: "A"
+        rosterMonth: "2026-08"
       });
 
       expect(monthContext.activeOfficial).toBeNull();

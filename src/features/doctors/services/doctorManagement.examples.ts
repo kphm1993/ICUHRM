@@ -6,6 +6,7 @@ import {
   ROSTER_SEED_OFF_REQUESTS,
   ROSTER_SEED_WEEKDAY_PAIR_BIAS_LEDGERS
 } from "@/app/seed/rosterSeedData";
+import { DEFAULT_DUTY_LOCATION_ID } from "@/domain/models";
 import type {
   Doctor,
   RosterSnapshot
@@ -15,6 +16,7 @@ import { createDoctorManagementService } from "@/features/doctors/services/docto
 import { buildRosterDoctorSummaryRows } from "@/features/roster/selectors/rosterReviewSelectors";
 import {
   InMemoryBiasLedgerRepository,
+  InMemoryDoctorGroupRepository,
   InMemoryLeaveRepository,
   InMemoryWeekdayPairBiasLedgerRepository
 } from "@/infrastructure/repositories/inMemory";
@@ -47,6 +49,7 @@ function createDoctorManagementExampleServices(storageKeyPrefix: string) {
 
   const doctorManagementService = createDoctorManagementService({
     doctorRepository,
+    doctorGroupRepository: new InMemoryDoctorGroupRepository(),
     leaveRepository: new InMemoryLeaveRepository(ROSTER_SEED_LEAVES),
     offRequestRepository,
     biasLedgerRepository: new InMemoryBiasLedgerRepository(ROSTER_SEED_BIAS_LEDGERS),
@@ -85,7 +88,6 @@ export async function runDoctorRepositoryPersistenceExample() {
       name: "Dr. Example",
       phoneNumber: "0719999999",
       uniqueIdentifier: "doctor.example",
-      weekendGroup: "A",
       isActive: true,
       createdAt: timestamp,
       updatedAt: timestamp
@@ -116,7 +118,6 @@ export async function runDoctorManagementServiceExamples() {
       name: "Dr. Shanika Silva",
       phoneNumber: "0711234567",
       uniqueIdentifier: "shanika.silva",
-      weekendGroup: "B",
       temporaryPassword: "Temp-Doctor-123",
       actorId: "user-admin-demo",
       actorRole: "ADMIN"
@@ -126,7 +127,6 @@ export async function runDoctorManagementServiceExamples() {
       name: "Dr. Shanika Silva",
       phoneNumber: "0717654321",
       uniqueIdentifier: "shanika.silva",
-      weekendGroup: "A",
       actorId: "user-admin-demo",
       actorRole: "ADMIN"
     });
@@ -188,7 +188,6 @@ export function runHistoricalDoctorReferenceExample() {
       name: "Dr. Renamed Current",
       phoneNumber: "0710000100",
       uniqueIdentifier: "doctor.history",
-      weekendGroup: "A",
       isActive: false,
       createdAt: "2026-03-01T00:00:00.000Z",
       updatedAt: "2026-04-02T00:00:00.000Z"
@@ -238,10 +237,14 @@ export function runHistoricalDoctorReferenceExample() {
       leaveCount: 0,
       offRequestCount: 0,
       shiftTypeCount: 2,
-      firstWeekendOffGroup: "A",
-      weekendGroupSchedule: [],
       activeBiasCriteria: ROSTER_SEED_BIAS_CRITERIA,
-      activeDutyLocations: []
+      activeDutyLocations: [],
+      doctorGroupSnapshot: {},
+      allowedDoctorGroupIdByDate: {},
+      dutyDesignAssignments: {},
+      dutyDesignSnapshot: {},
+      publicHolidayDates: [],
+      fallbackLocationId: DEFAULT_DUTY_LOCATION_ID
     }
   };
 

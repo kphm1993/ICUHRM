@@ -68,6 +68,69 @@ export function AdminSettingsPage() {
             Configuration
           </p>
           <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
+            Shift Types Manager
+          </h2>
+          <p className="mt-3 text-sm text-slate-600">
+            Maintain persisted day, night, and custom shift definitions with
+            explicit timing and active-status control.
+          </p>
+          <div className="mt-4">
+            <Link
+              className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-brand-300 hover:text-brand-800"
+              to="/admin/shift-types"
+            >
+              Manage Shift Types
+            </Link>
+          </div>
+        </article>
+
+        <article className="rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-panel">
+          <p className="text-sm font-semibold uppercase tracking-[0.24em] text-brand-700">
+            Configuration
+          </p>
+          <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
+            Duty Designs Manager
+          </h2>
+          <p className="mt-3 text-sm text-slate-600">
+            Create reusable duty-block patterns with shift type, location, and
+            follow-up rules for future scheduling extensions.
+          </p>
+          <div className="mt-4">
+            <Link
+              className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-brand-300 hover:text-brand-800"
+              to="/admin/duty-designs"
+            >
+              Manage Duty Designs
+            </Link>
+          </div>
+        </article>
+
+        <article className="rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-panel">
+          <p className="text-sm font-semibold uppercase tracking-[0.24em] text-brand-700">
+            Configuration
+          </p>
+          <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
+            Duty Design Assignments
+          </h2>
+          <p className="mt-3 text-sm text-slate-600">
+            Assign duty designs across calendar dates with explicit holiday override
+            handling and stacked per-day visibility.
+          </p>
+          <div className="mt-4">
+            <Link
+              className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-brand-300 hover:text-brand-800"
+              to="/admin/duty-design-assignments"
+            >
+              Open Duty Design Assignments
+            </Link>
+          </div>
+        </article>
+
+        <article className="rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-panel">
+          <p className="text-sm font-semibold uppercase tracking-[0.24em] text-brand-700">
+            Configuration
+          </p>
+          <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
             Duty Locations Manager
           </h2>
           <p className="mt-3 text-sm text-slate-600">

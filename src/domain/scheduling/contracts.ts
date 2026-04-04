@@ -1,10 +1,14 @@
 import type {
   Assignment,
+  AllowedDoctorGroupIdByDate,
   BiasCriteria,
   BiasLedger,
   Doctor,
+  DutyDesign,
+  DutyDesignAssignment,
   DutyLocation,
   EntityId,
+  ISODateString,
   Leave,
   OffRequest,
   PriorityLevel,
@@ -16,6 +20,25 @@ import type {
 import type { SchedulingEngineConfig } from "@/domain/scheduling/config";
 
 export type CriteriaCountMap = Readonly<Record<EntityId, number>>;
+export type ShiftPoolSource =
+  | "DUTY_DESIGN_STANDARD"
+  | "DUTY_DESIGN_HOLIDAY_OVERRIDE"
+  | "LEGACY_FALLBACK";
+
+export type BlockedDatesByDoctorId = ReadonlyMap<
+  EntityId,
+  ReadonlySet<ISODateString>
+>;
+
+export interface GeneratedShiftMetadata {
+  readonly source: ShiftPoolSource;
+  readonly sourceDate: ISODateString;
+  readonly dutyDesignId?: EntityId;
+  readonly dutyDesignBlockIndex?: number;
+  readonly slotIndex?: number;
+  readonly offOffsetDays?: number;
+  readonly followUpDutyDesignId?: EntityId;
+}
 
 export interface DoctorFairnessLoadSnapshot {
   readonly doctorId: EntityId;
@@ -43,6 +66,7 @@ export type ValidationIssueCode =
   | "ASSIGNMENT_ON_LEAVE"
   | "ASSIGNMENT_SAME_DAY_CONFLICT"
   | "ASSIGNMENT_REST_AFTER_NIGHT_VIOLATION"
+  | "ASSIGNMENT_GROUP_CONSTRAINT_VIOLATION"
   | "SHIFT_LOCATION_INVALID"
   | "BIAS_LEDGER_UNKNOWN_CRITERIA"
   | "ASSIGNMENT_WEEKEND_OFF_GROUP"
@@ -67,13 +91,17 @@ export interface GenerateRosterInput {
   readonly range: RosterPeriod;
   readonly doctors: ReadonlyArray<Doctor>;
   readonly shiftTypes: ReadonlyArray<ShiftType>;
+  readonly dutyDesigns: ReadonlyArray<DutyDesign>;
+  readonly dutyDesignAssignments: ReadonlyArray<DutyDesignAssignment>;
+  readonly publicHolidayDates?: ReadonlyArray<ISODateString>;
   readonly leaves: ReadonlyArray<Leave>;
   readonly offRequests: ReadonlyArray<OffRequest>;
   readonly currentBias: ReadonlyArray<BiasLedger>;
   readonly activeBiasCriteria: ReadonlyArray<BiasCriteria>;
   readonly activeDutyLocations: ReadonlyArray<DutyLocation>;
-  readonly generationLocationId: EntityId;
-  readonly weekendGroupSchedule: ReadonlyArray<WeekendGroupScheduleEntry>;
+  readonly fallbackLocationId: EntityId;
+  readonly allowedDoctorGroupIdByDate: AllowedDoctorGroupIdByDate;
+  readonly weekendGroupSchedule?: ReadonlyArray<WeekendGroupScheduleEntry>;
   readonly generatedByActorId: EntityId;
   readonly config?: SchedulingEngineConfig;
 }
@@ -90,8 +118,18 @@ export interface GenerateShiftPoolInput {
   readonly rosterId: EntityId;
   readonly range: RosterPeriod;
   readonly shiftTypes: ReadonlyArray<ShiftType>;
-  readonly generationLocationId: EntityId;
-  readonly weekendGroupSchedule: ReadonlyArray<WeekendGroupScheduleEntry>;
+  readonly dutyDesigns: ReadonlyArray<DutyDesign>;
+  readonly dutyDesignAssignments: ReadonlyArray<DutyDesignAssignment>;
+  readonly publicHolidayDates?: ReadonlyArray<ISODateString>;
+  readonly activeDutyLocations: ReadonlyArray<DutyLocation>;
+  readonly fallbackLocationId: EntityId;
+  readonly weekendGroupSchedule?: ReadonlyArray<WeekendGroupScheduleEntry>;
+}
+
+export interface GenerateShiftPoolOutput {
+  readonly shifts: ReadonlyArray<Shift>;
+  readonly shiftMetadataById: ReadonlyMap<EntityId, GeneratedShiftMetadata>;
+  readonly warnings: ReadonlyArray<string>;
 }
 
 export interface EligibilityDecision {
@@ -106,7 +144,10 @@ export interface CheckEligibilityInput {
   readonly leaves: ReadonlyArray<Leave>;
   readonly currentAssignments: ReadonlyArray<Assignment>;
   readonly shiftsById: ReadonlyMap<EntityId, Shift>;
-  readonly weekendGroupSchedule: ReadonlyArray<WeekendGroupScheduleEntry>;
+  readonly shiftMetadataById: ReadonlyMap<EntityId, GeneratedShiftMetadata>;
+  readonly blockedDatesByDoctorId: BlockedDatesByDoctorId;
+  readonly allowedDoctorGroupIdByDate: AllowedDoctorGroupIdByDate;
+  readonly weekendGroupSchedule?: ReadonlyArray<WeekendGroupScheduleEntry>;
 }
 
 export interface CandidateScoreBreakdown {
@@ -143,5 +184,6 @@ export interface ValidateRosterInput {
   readonly updatedBias: ReadonlyArray<BiasLedger>;
   readonly activeBiasCriteria: ReadonlyArray<BiasCriteria>;
   readonly activeDutyLocations: ReadonlyArray<DutyLocation>;
-  readonly weekendGroupSchedule: ReadonlyArray<WeekendGroupScheduleEntry>;
+  readonly allowedDoctorGroupIdByDate: AllowedDoctorGroupIdByDate;
+  readonly weekendGroupSchedule?: ReadonlyArray<WeekendGroupScheduleEntry>;
 }

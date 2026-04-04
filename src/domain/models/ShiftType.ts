@@ -11,9 +11,8 @@ export interface ShiftType {
   readonly label: string;
   readonly startTime: TimeOfDayString;
   readonly endTime: TimeOfDayString;
-  readonly defaultKind: ShiftKind;
+  readonly category: ShiftKind;
   readonly isActive: boolean;
   readonly createdAt: ISODateTimeString;
   readonly updatedAt: ISODateTimeString;
 }
-

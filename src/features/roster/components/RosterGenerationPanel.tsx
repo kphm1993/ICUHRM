@@ -22,9 +22,9 @@ interface RosterGenerationPanelProps {
 
 export function RosterGenerationPanel(props: RosterGenerationPanelProps) {
   const weekendPreview =
-    props.sourceSummary?.weekendGroupSchedule.map((entry) => {
+    (props.sourceSummary?.weekendGroupSchedule ?? []).map((entry) => {
       return `${entry.weekendStartDate} • Off ${entry.offGroup}`;
-    }) ?? [];
+    });
 
   return (
     <section className="space-y-4 rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-panel">

@@ -1,5 +1,3 @@
-import type { WeekendGroup } from "@/domain/models";
-
 export class DoctorValidationError extends Error {
   readonly code = "VALIDATION_ERROR" as const;
 
@@ -13,7 +11,7 @@ export interface NormalizedDoctorInput {
   readonly name: string;
   readonly phoneNumber: string;
   readonly uniqueIdentifier: string;
-  readonly weekendGroup: WeekendGroup;
+  readonly groupId?: string;
   readonly temporaryPassword: string;
 }
 
@@ -25,14 +23,6 @@ function normalizeRequiredText(value: string, label: string): string {
   }
 
   return normalizedValue;
-}
-
-function normalizeWeekendGroup(value: WeekendGroup): WeekendGroup {
-  if (value !== "A" && value !== "B") {
-    throw new DoctorValidationError("Weekend group must be either A or B.");
-  }
-
-  return value;
 }
 
 function normalizeTemporaryPassword(
@@ -54,7 +44,7 @@ export function validateCreateDoctorInput(input: {
   readonly name: string;
   readonly phoneNumber: string;
   readonly uniqueIdentifier: string;
-  readonly weekendGroup: WeekendGroup;
+  readonly groupId?: string;
   readonly temporaryPassword: string;
 }): NormalizedDoctorInput {
   return {
@@ -64,7 +54,7 @@ export function validateCreateDoctorInput(input: {
       input.uniqueIdentifier,
       "Unique ID / employee ID"
     ),
-    weekendGroup: normalizeWeekendGroup(input.weekendGroup),
+    groupId: input.groupId?.trim() || undefined,
     temporaryPassword: normalizeTemporaryPassword(input.temporaryPassword, {
       required: true
     })
@@ -75,7 +65,7 @@ export function validateUpdateDoctorInput(input: {
   readonly name: string;
   readonly phoneNumber: string;
   readonly uniqueIdentifier: string;
-  readonly weekendGroup: WeekendGroup;
+  readonly groupId?: string;
   readonly temporaryPassword?: string;
 }): NormalizedDoctorInput {
   return {
@@ -85,7 +75,7 @@ export function validateUpdateDoctorInput(input: {
       input.uniqueIdentifier,
       "Unique ID / employee ID"
     ),
-    weekendGroup: normalizeWeekendGroup(input.weekendGroup),
+    groupId: input.groupId?.trim() || undefined,
     temporaryPassword: normalizeTemporaryPassword(input.temporaryPassword ?? "", {
       required: false
     })

@@ -192,7 +192,13 @@ const EXAMPLE_SNAPSHOT: RosterSnapshot = {
     firstWeekendOffGroup: "A",
     weekendGroupSchedule: [],
     activeBiasCriteria: [],
-    activeDutyLocations: []
+    activeDutyLocations: [],
+    doctorGroupSnapshot: {},
+    allowedDoctorGroupIdByDate: {},
+    dutyDesignAssignments: {},
+    dutyDesignSnapshot: {},
+    publicHolidayDates: [],
+    fallbackLocationId: DEFAULT_DUTY_LOCATION_ID
   }
 };
 

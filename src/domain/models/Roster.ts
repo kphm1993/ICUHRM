@@ -28,6 +28,6 @@ export interface Roster {
   readonly generatedAt?: ISODateTimeString;
   readonly publishedAt?: ISODateTimeString;
   readonly lockedAt?: ISODateTimeString;
-  readonly weekendGroupSchedule: ReadonlyArray<WeekendGroupScheduleEntry>;
+  readonly weekendGroupSchedule?: ReadonlyArray<WeekendGroupScheduleEntry>;
   readonly notes?: string;
 }

@@ -1,10 +1,13 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AppShell } from "@/app/layouts/AppShell";
 import { AdminBiasCriteriaPage } from "@/features/admin/pages/AdminBiasCriteriaPage";
+import { AdminDutyDesignAssignmentPage } from "@/features/admin/pages/AdminDutyDesignAssignmentPage";
+import { AdminDutyDesignPage } from "@/features/admin/pages/AdminDutyDesignPage";
 import { AdminDoctorsPage } from "@/features/admin/pages/AdminDoctorsPage";
 import { AdminLocationsPage } from "@/features/admin/pages/AdminLocationsPage";
 import { AdminRostersPage } from "@/features/admin/pages/AdminRostersPage";
 import { AdminSettingsPage } from "@/features/admin/pages/AdminSettingsPage";
+import { AdminShiftTypePage } from "@/features/admin/pages/AdminShiftTypePage";
 import { LoginPage } from "@/features/auth/pages/LoginPage";
 import { RequireAuth } from "@/features/auth/components/RequireAuth";
 import { RequireRole } from "@/features/auth/components/RequireRole";
@@ -47,6 +50,12 @@ export function AppRouter() {
               <Route element={<AdminSettingsPage />} path="/admin" />
               <Route element={<AdminRostersPage />} path="/admin/rosters" />
               <Route element={<AdminDoctorsPage />} path="/admin/doctors" />
+              <Route element={<AdminShiftTypePage />} path="/admin/shift-types" />
+              <Route element={<AdminDutyDesignPage />} path="/admin/duty-designs" />
+              <Route
+                element={<AdminDutyDesignAssignmentPage />}
+                path="/admin/duty-design-assignments"
+              />
               <Route element={<AdminLocationsPage />} path="/admin/locations" />
               <Route
                 element={<AdminBiasCriteriaPage />}

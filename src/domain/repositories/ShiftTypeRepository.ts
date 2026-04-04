@@ -2,13 +2,17 @@ import type { EntityId, ShiftKind, ShiftType } from "@/domain/models";
 
 export interface ShiftTypeRepositoryFilter {
   readonly isActive?: boolean;
-  readonly defaultKind?: ShiftKind;
+  readonly category?: ShiftKind;
 }
 
 export interface ShiftTypeRepository {
-  list(filter?: ShiftTypeRepositoryFilter): Promise<ReadonlyArray<ShiftType>>;
-  findById(id: EntityId): Promise<ShiftType | null>;
-  findByCode(code: string): Promise<ShiftType | null>;
-  save(shiftType: ShiftType): Promise<ShiftType>;
+  create(shiftType: ShiftType): Promise<ShiftType>;
+  update(
+    id: EntityId,
+    changes: Partial<ShiftType>
+  ): Promise<ShiftType>;
+  delete(id: EntityId): Promise<void>;
+  getById(id: EntityId): Promise<ShiftType | null>;
+  listActive(filter?: Omit<ShiftTypeRepositoryFilter, "isActive">): Promise<ReadonlyArray<ShiftType>>;
+  listAll(filter?: ShiftTypeRepositoryFilter): Promise<ReadonlyArray<ShiftType>>;
 }
-

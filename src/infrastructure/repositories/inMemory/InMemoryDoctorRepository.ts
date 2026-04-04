@@ -9,7 +9,11 @@ import {
 } from "@/domain/repositories";
 
 function cloneDoctor(doctor: Doctor): Doctor {
-  return { ...doctor };
+  return {
+    ...doctor,
+    groupId: doctor.groupId,
+    weekendGroup: undefined
+  };
 }
 
 function sortDoctors(doctors: ReadonlyArray<Doctor>): ReadonlyArray<Doctor> {
@@ -24,8 +28,9 @@ export class InMemoryDoctorRepository implements DoctorRepository {
 
   constructor(seedData: ReadonlyArray<Doctor> = []) {
     for (const doctor of seedData) {
-      this.assertUniqueConstraints(doctor);
-      this.doctorsById.set(doctor.id, cloneDoctor(doctor));
+      const normalizedDoctor = cloneDoctor(doctor);
+      this.assertUniqueConstraints(normalizedDoctor);
+      this.doctorsById.set(normalizedDoctor.id, normalizedDoctor);
     }
   }
 
@@ -36,6 +41,10 @@ export class InMemoryDoctorRepository implements DoctorRepository {
       }
 
       if (filter?.userId !== undefined && doctor.userId !== filter.userId) {
+        return false;
+      }
+
+      if (filter?.groupId !== undefined && doctor.groupId !== filter.groupId) {
         return false;
       }
 
@@ -74,9 +83,15 @@ export class InMemoryDoctorRepository implements DoctorRepository {
   }
 
   async save(doctor: Doctor): Promise<Doctor> {
-    this.assertUniqueConstraints(doctor);
-    this.doctorsById.set(doctor.id, cloneDoctor(doctor));
-    return cloneDoctor(doctor);
+    const normalizedDoctor = {
+      ...doctor,
+      groupId: doctor.groupId,
+      weekendGroup: undefined
+    } satisfies Doctor;
+
+    this.assertUniqueConstraints(normalizedDoctor);
+    this.doctorsById.set(normalizedDoctor.id, cloneDoctor(normalizedDoctor));
+    return cloneDoctor(normalizedDoctor);
   }
 
   async delete(id: string): Promise<void> {

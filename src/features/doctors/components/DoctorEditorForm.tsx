@@ -98,16 +98,15 @@ export function DoctorEditorForm(props: DoctorEditorFormProps) {
         </label>
 
         <label className="block space-y-2">
-          <span className="text-sm font-medium text-slate-700">Weekend group</span>
+          <span className="text-sm font-medium text-slate-700">Group ID</span>
           <select
             className="w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-brand-500 focus:bg-white"
-            value={props.values.weekendGroup}
+            value={props.values.groupId}
             onChange={(event) =>
-              props.onChange("weekendGroup", event.target.value as "A" | "B")
+              props.onChange("groupId", event.target.value)
             }
           >
-            <option value="A">Group A</option>
-            <option value="B">Group B</option>
+            <option value="">Unassigned</option>
           </select>
         </label>
 

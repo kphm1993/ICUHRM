@@ -12,8 +12,8 @@ export function AdminDoctorsPage() {
           Doctors
         </h1>
         <p className="mt-3 max-w-3xl text-sm text-slate-600 sm:text-base">
-          Manage doctor base data, weekend groups, and active status from a dedicated
-          admin tools section without mixing those controls into the hub page.
+          Manage doctor base data, reusable doctor groups, and active status from a
+          dedicated admin tools section without mixing those controls into the hub page.
         </p>
       </header>
 

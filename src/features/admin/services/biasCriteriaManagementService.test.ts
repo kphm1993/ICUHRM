@@ -6,6 +6,7 @@ import type {
   Doctor,
   RosterSnapshot
 } from "@/domain/models";
+import { DEFAULT_DUTY_LOCATION_ID as DEFAULT_FALLBACK_LOCATION_ID } from "@/domain/models";
 import type { RosterSnapshotRepository } from "@/domain/repositories";
 import { CriteriaInUseError, CriteriaLockedError } from "@/domain/repositories";
 import {
@@ -137,7 +138,13 @@ function createSnapshotReferencingCriteria(criteriaId: string): RosterSnapshot {
       firstWeekendOffGroup: "A",
       weekendGroupSchedule: [],
       activeBiasCriteria: [],
-      activeDutyLocations: []
+      activeDutyLocations: [],
+      doctorGroupSnapshot: {},
+      allowedDoctorGroupIdByDate: {},
+      dutyDesignAssignments: {},
+      dutyDesignSnapshot: {},
+      publicHolidayDates: [],
+      fallbackLocationId: DEFAULT_FALLBACK_LOCATION_ID
     }
   };
 }

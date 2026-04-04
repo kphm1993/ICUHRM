@@ -34,7 +34,7 @@ function BiasCriteriaBuilderFormHarness() {
       label: "Day",
       startTime: "08:00",
       endTime: "20:00",
-      defaultKind: "DAY" as const,
+      category: "DAY" as const,
       isActive: true,
       createdAt: "2026-04-03T08:00:00.000Z",
       updatedAt: "2026-04-03T08:00:00.000Z"
@@ -158,7 +158,7 @@ describe("BiasCriteriaBuilderForm", () => {
         label: "Day",
         startTime: "08:00",
         endTime: "20:00",
-        defaultKind: "DAY" as const,
+        category: "DAY" as const,
         isActive: true,
         createdAt: "2026-04-03T08:00:00.000Z",
         updatedAt: "2026-04-03T08:00:00.000Z"

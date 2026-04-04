@@ -26,6 +26,24 @@ export function AdminToolsSubnav() {
       </NavLink>
       <NavLink
         className={({ isActive }) => getLinkClasses(isActive)}
+        to="/admin/shift-types"
+      >
+        Shift Types
+      </NavLink>
+      <NavLink
+        className={({ isActive }) => getLinkClasses(isActive)}
+        to="/admin/duty-designs"
+      >
+        Duty Designs
+      </NavLink>
+      <NavLink
+        className={({ isActive }) => getLinkClasses(isActive)}
+        to="/admin/duty-design-assignments"
+      >
+        Duty Design Assignments
+      </NavLink>
+      <NavLink
+        className={({ isActive }) => getLinkClasses(isActive)}
         to="/admin/locations"
       >
         Duty Locations

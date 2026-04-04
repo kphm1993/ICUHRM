@@ -3,6 +3,8 @@ import {
   type Assignment,
   type BiasCriteria,
   type BiasLedger,
+  type DutyDesign,
+  type DutyDesignAssignment,
   type Doctor,
   type DutyLocation,
   type Leave,
@@ -30,7 +32,7 @@ const EXAMPLE_SHIFT_TYPES: ReadonlyArray<ShiftType> = [
     label: "Day",
     startTime: "08:00",
     endTime: "20:00",
-    defaultKind: "DAY",
+    category: "DAY",
     isActive: true,
     createdAt: "2026-04-01T00:00:00.000Z",
     updatedAt: "2026-04-01T00:00:00.000Z"
@@ -41,12 +43,18 @@ const EXAMPLE_SHIFT_TYPES: ReadonlyArray<ShiftType> = [
     label: "Night",
     startTime: "20:00",
     endTime: "08:00",
-    defaultKind: "NIGHT",
+    category: "NIGHT",
     isActive: true,
     createdAt: "2026-04-01T00:00:00.000Z",
     updatedAt: "2026-04-01T00:00:00.000Z"
   }
 ];
+
+const EXAMPLE_DUTY_DESIGNS: ReadonlyArray<DutyDesign> = [];
+const EXAMPLE_DUTY_DESIGN_ASSIGNMENTS: ReadonlyArray<DutyDesignAssignment> = [];
+const EMPTY_SHIFT_METADATA_BY_ID = new Map<string, never>();
+const EMPTY_BLOCKED_DATES_BY_DOCTOR_ID = new Map<string, ReadonlySet<string>>();
+const EMPTY_ALLOWED_DOCTOR_GROUP_ID_BY_DATE = {};
 
 const EXAMPLE_DUTY_LOCATIONS: ReadonlyArray<DutyLocation> = [
   {
@@ -122,12 +130,15 @@ const CLASSIFICATION_SHIFTS = generateShiftPool({
     endDate: "2026-04-05"
   },
   shiftTypes: EXAMPLE_SHIFT_TYPES,
-  generationLocationId: DEFAULT_DUTY_LOCATION_ID,
+  dutyDesigns: EXAMPLE_DUTY_DESIGNS,
+  dutyDesignAssignments: EXAMPLE_DUTY_DESIGN_ASSIGNMENTS,
+  activeDutyLocations: EXAMPLE_DUTY_LOCATIONS,
+  fallbackLocationId: DEFAULT_DUTY_LOCATION_ID,
   weekendGroupSchedule: EXAMPLE_WEEKEND_SCHEDULE
 });
 
 const CLASSIFICATION_SHIFTS_BY_ID = new Map(
-  CLASSIFICATION_SHIFTS.map((shift) => [shift.id, shift] as const)
+  CLASSIFICATION_SHIFTS.shifts.map((shift) => [shift.id, shift] as const)
 );
 
 const WEEKDAY_PAIR_CLASSIFICATION_SHIFTS = generateShiftPool({
@@ -137,7 +148,10 @@ const WEEKDAY_PAIR_CLASSIFICATION_SHIFTS = generateShiftPool({
     endDate: "2026-04-10"
   },
   shiftTypes: EXAMPLE_SHIFT_TYPES,
-  generationLocationId: DEFAULT_DUTY_LOCATION_ID,
+  dutyDesigns: EXAMPLE_DUTY_DESIGNS,
+  dutyDesignAssignments: EXAMPLE_DUTY_DESIGN_ASSIGNMENTS,
+  activeDutyLocations: EXAMPLE_DUTY_LOCATIONS,
+  fallbackLocationId: DEFAULT_DUTY_LOCATION_ID,
   weekendGroupSchedule: EXAMPLE_WEEKEND_SCHEDULE
 });
 
@@ -148,16 +162,19 @@ const REST_CONSTRAINT_SHIFTS = generateShiftPool({
     endDate: "2026-04-13"
   },
   shiftTypes: EXAMPLE_SHIFT_TYPES,
-  generationLocationId: DEFAULT_DUTY_LOCATION_ID,
+  dutyDesigns: EXAMPLE_DUTY_DESIGNS,
+  dutyDesignAssignments: EXAMPLE_DUTY_DESIGN_ASSIGNMENTS,
+  activeDutyLocations: EXAMPLE_DUTY_LOCATIONS,
+  fallbackLocationId: DEFAULT_DUTY_LOCATION_ID,
   weekendGroupSchedule: EXAMPLE_WEEKEND_SCHEDULE
 });
 
 const REST_CONSTRAINT_SHIFTS_BY_ID = new Map(
-  REST_CONSTRAINT_SHIFTS.map((shift) => [shift.id, shift] as const)
+  REST_CONSTRAINT_SHIFTS.shifts.map((shift) => [shift.id, shift] as const)
 );
 
 function findExampleShift(date: string, code: string): Shift {
-  const shift = CLASSIFICATION_SHIFTS.find(
+  const shift = CLASSIFICATION_SHIFTS.shifts.find(
     (entry) => entry.date === date && entry.definitionSnapshot.code === code
   );
 
@@ -169,7 +186,7 @@ function findExampleShift(date: string, code: string): Shift {
 }
 
 function findWeekdayPairExampleShift(date: string, code: string): Shift {
-  const shift = WEEKDAY_PAIR_CLASSIFICATION_SHIFTS.find(
+  const shift = WEEKDAY_PAIR_CLASSIFICATION_SHIFTS.shifts.find(
     (entry) => entry.date === date && entry.definitionSnapshot.code === code
   );
 
@@ -181,7 +198,7 @@ function findWeekdayPairExampleShift(date: string, code: string): Shift {
 }
 
 function findRestConstraintExampleShift(date: string, code: string): Shift {
-  const shift = REST_CONSTRAINT_SHIFTS.find(
+  const shift = REST_CONSTRAINT_SHIFTS.shifts.find(
     (entry) => entry.date === date && entry.definitionSnapshot.code === code
   );
 
@@ -291,6 +308,9 @@ export const leaveExclusionExample = checkShiftEligibility({
   leaves: LEAVE_EXAMPLE_LEAVES,
   currentAssignments: [],
   shiftsById: CLASSIFICATION_SHIFTS_BY_ID,
+  shiftMetadataById: CLASSIFICATION_SHIFTS.shiftMetadataById,
+  blockedDatesByDoctorId: EMPTY_BLOCKED_DATES_BY_DOCTOR_ID,
+  allowedDoctorGroupIdByDate: EMPTY_ALLOWED_DOCTOR_GROUP_ID_BY_DATE,
   weekendGroupSchedule: EXAMPLE_WEEKEND_SCHEDULE
 });
 
@@ -300,6 +320,9 @@ export const weekendGroupExclusionExample = checkShiftEligibility({
   leaves: [],
   currentAssignments: [],
   shiftsById: CLASSIFICATION_SHIFTS_BY_ID,
+  shiftMetadataById: CLASSIFICATION_SHIFTS.shiftMetadataById,
+  blockedDatesByDoctorId: EMPTY_BLOCKED_DATES_BY_DOCTOR_ID,
+  allowedDoctorGroupIdByDate: EMPTY_ALLOWED_DOCTOR_GROUP_ID_BY_DATE,
   weekendGroupSchedule: EXAMPLE_WEEKEND_SCHEDULE
 });
 
@@ -322,6 +345,9 @@ export const oneShiftPerDayEligibilityExample = {
     leaves: [],
     currentAssignments: [sameDayDayAssignment],
     shiftsById: CLASSIFICATION_SHIFTS_BY_ID,
+    shiftMetadataById: CLASSIFICATION_SHIFTS.shiftMetadataById,
+    blockedDatesByDoctorId: EMPTY_BLOCKED_DATES_BY_DOCTOR_ID,
+    allowedDoctorGroupIdByDate: EMPTY_ALLOWED_DOCTOR_GROUP_ID_BY_DATE,
     weekendGroupSchedule: EXAMPLE_WEEKEND_SCHEDULE
   }),
   sundayNight: checkShiftEligibility({
@@ -330,6 +356,9 @@ export const oneShiftPerDayEligibilityExample = {
     leaves: [],
     currentAssignments: [sameDayDayAssignment],
     shiftsById: CLASSIFICATION_SHIFTS_BY_ID,
+    shiftMetadataById: CLASSIFICATION_SHIFTS.shiftMetadataById,
+    blockedDatesByDoctorId: EMPTY_BLOCKED_DATES_BY_DOCTOR_ID,
+    allowedDoctorGroupIdByDate: EMPTY_ALLOWED_DOCTOR_GROUP_ID_BY_DATE,
     weekendGroupSchedule: EXAMPLE_WEEKEND_SCHEDULE
   })
 };
@@ -365,6 +394,9 @@ export const restAfterNightEligibilityExample = {
     leaves: [],
     currentAssignments: [thursdayNightAssignment],
     shiftsById: REST_CONSTRAINT_SHIFTS_BY_ID,
+    shiftMetadataById: REST_CONSTRAINT_SHIFTS.shiftMetadataById,
+    blockedDatesByDoctorId: EMPTY_BLOCKED_DATES_BY_DOCTOR_ID,
+    allowedDoctorGroupIdByDate: EMPTY_ALLOWED_DOCTOR_GROUP_ID_BY_DATE,
     weekendGroupSchedule: EXAMPLE_WEEKEND_SCHEDULE
   }),
   fridayNightBlocked: checkShiftEligibility({
@@ -373,6 +405,9 @@ export const restAfterNightEligibilityExample = {
     leaves: [],
     currentAssignments: [thursdayNightAssignment],
     shiftsById: REST_CONSTRAINT_SHIFTS_BY_ID,
+    shiftMetadataById: REST_CONSTRAINT_SHIFTS.shiftMetadataById,
+    blockedDatesByDoctorId: EMPTY_BLOCKED_DATES_BY_DOCTOR_ID,
+    allowedDoctorGroupIdByDate: EMPTY_ALLOWED_DOCTOR_GROUP_ID_BY_DATE,
     weekendGroupSchedule: EXAMPLE_WEEKEND_SCHEDULE
   }),
   saturdayDayAllowed: checkShiftEligibility({
@@ -381,6 +416,9 @@ export const restAfterNightEligibilityExample = {
     leaves: [],
     currentAssignments: [thursdayNightAssignment],
     shiftsById: REST_CONSTRAINT_SHIFTS_BY_ID,
+    shiftMetadataById: REST_CONSTRAINT_SHIFTS.shiftMetadataById,
+    blockedDatesByDoctorId: EMPTY_BLOCKED_DATES_BY_DOCTOR_ID,
+    allowedDoctorGroupIdByDate: EMPTY_ALLOWED_DOCTOR_GROUP_ID_BY_DATE,
     weekendGroupSchedule: EXAMPLE_WEEKEND_SCHEDULE
   }),
   mondayDayAfterSundayNightBlocked: checkShiftEligibility({
@@ -389,6 +427,9 @@ export const restAfterNightEligibilityExample = {
     leaves: [],
     currentAssignments: [sundayNightAssignment],
     shiftsById: REST_CONSTRAINT_SHIFTS_BY_ID,
+    shiftMetadataById: REST_CONSTRAINT_SHIFTS.shiftMetadataById,
+    blockedDatesByDoctorId: EMPTY_BLOCKED_DATES_BY_DOCTOR_ID,
+    allowedDoctorGroupIdByDate: EMPTY_ALLOWED_DOCTOR_GROUP_ID_BY_DATE,
     weekendGroupSchedule: EXAMPLE_WEEKEND_SCHEDULE
   }),
   mondayNightAfterSundayNightBlocked: checkShiftEligibility({
@@ -397,6 +438,9 @@ export const restAfterNightEligibilityExample = {
     leaves: [],
     currentAssignments: [sundayNightAssignment],
     shiftsById: REST_CONSTRAINT_SHIFTS_BY_ID,
+    shiftMetadataById: REST_CONSTRAINT_SHIFTS.shiftMetadataById,
+    blockedDatesByDoctorId: EMPTY_BLOCKED_DATES_BY_DOCTOR_ID,
+    allowedDoctorGroupIdByDate: EMPTY_ALLOWED_DOCTOR_GROUP_ID_BY_DATE,
     weekendGroupSchedule: EXAMPLE_WEEKEND_SCHEDULE
   })
 };
@@ -477,12 +521,15 @@ export const deterministicAssignmentExample = generateRoster({
   },
   doctors: EXAMPLE_DOCTORS,
   shiftTypes: EXAMPLE_SHIFT_TYPES,
+  dutyDesigns: EXAMPLE_DUTY_DESIGNS,
+  dutyDesignAssignments: EXAMPLE_DUTY_DESIGN_ASSIGNMENTS,
   leaves: [],
   offRequests: EMPTY_OFF_REQUESTS,
   currentBias: EXAMPLE_BIAS_LEDGER,
   activeBiasCriteria: EXAMPLE_BIAS_CRITERIA,
   activeDutyLocations: EXAMPLE_DUTY_LOCATIONS,
-  generationLocationId: DEFAULT_DUTY_LOCATION_ID,
+  fallbackLocationId: DEFAULT_DUTY_LOCATION_ID,
+  allowedDoctorGroupIdByDate: EMPTY_ALLOWED_DOCTOR_GROUP_ID_BY_DATE,
   weekendGroupSchedule: [],
   generatedByActorId: "system",
   config: DEFAULT_SCHEDULING_ENGINE_CONFIG
@@ -522,6 +569,7 @@ export const oneShiftPerDayValidationExample = validateGeneratedRoster({
   updatedBias: [],
   activeBiasCriteria: EXAMPLE_BIAS_CRITERIA,
   activeDutyLocations: EXAMPLE_DUTY_LOCATIONS,
+  allowedDoctorGroupIdByDate: EMPTY_ALLOWED_DOCTOR_GROUP_ID_BY_DATE,
   weekendGroupSchedule: []
 });
 
@@ -559,6 +607,7 @@ export const restAfterNightValidationExample = validateGeneratedRoster({
   updatedBias: [],
   activeBiasCriteria: EXAMPLE_BIAS_CRITERIA,
   activeDutyLocations: EXAMPLE_DUTY_LOCATIONS,
+  allowedDoctorGroupIdByDate: EMPTY_ALLOWED_DOCTOR_GROUP_ID_BY_DATE,
   weekendGroupSchedule: EXAMPLE_WEEKEND_SCHEDULE
 });
 

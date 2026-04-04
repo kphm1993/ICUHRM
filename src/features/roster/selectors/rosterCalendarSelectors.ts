@@ -266,7 +266,13 @@ function sortShiftEntries(left: Shift, right: Shift): number {
     return startTimeComparison;
   }
 
-  return left.definitionSnapshot.code.localeCompare(right.definitionSnapshot.code);
+  const definitionComparison = left.definitionSnapshot.code.localeCompare(
+    right.definitionSnapshot.code
+  );
+
+  return definitionComparison !== 0
+    ? definitionComparison
+    : left.id.localeCompare(right.id);
 }
 
 function buildSlotAriaLabel(

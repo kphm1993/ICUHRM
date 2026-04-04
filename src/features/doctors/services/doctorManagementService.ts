@@ -1,12 +1,13 @@
 import type {
   ActorRole,
   Doctor,
+  DoctorGroup,
   EntityId,
-  WeekendGroup
 } from "@/domain/models";
 import type {
   BiasLedgerRepository,
   DoctorRepository,
+  DoctorGroupRepository,
   LeaveRepository,
   OffRequestRepository,
   RosterSnapshotRepository,
@@ -24,7 +25,7 @@ export interface CreateDoctorInput {
   readonly name: string;
   readonly phoneNumber: string;
   readonly uniqueIdentifier: string;
-  readonly weekendGroup: WeekendGroup;
+  readonly groupId?: EntityId;
   readonly temporaryPassword: string;
   readonly actorId: EntityId;
   readonly actorRole: ActorRole;
@@ -34,7 +35,7 @@ export interface UpdateDoctorInput {
   readonly name: string;
   readonly phoneNumber: string;
   readonly uniqueIdentifier: string;
-  readonly weekendGroup: WeekendGroup;
+  readonly groupId?: EntityId;
   readonly temporaryPassword?: string;
   readonly actorId: EntityId;
   readonly actorRole: ActorRole;
@@ -89,6 +90,7 @@ export interface DoctorManagementService {
 
 export interface DoctorManagementServiceDependencies {
   readonly doctorRepository: DoctorRepository;
+  readonly doctorGroupRepository: DoctorGroupRepository;
   readonly leaveRepository: LeaveRepository;
   readonly offRequestRepository: OffRequestRepository;
   readonly biasLedgerRepository: BiasLedgerRepository;
@@ -109,7 +111,7 @@ async function appendDoctorAuditLog(
       | "DOCTOR_DEACTIVATED"
       | "DOCTOR_DELETED"
       | "DOCTOR_DELETE_BLOCKED"
-      | "WEEKEND_GROUP_CHANGED";
+      | "DOCTOR_GROUP_CHANGED";
     readonly doctor: Doctor;
     readonly details: Readonly<Record<string, unknown>>;
   }
@@ -122,6 +124,23 @@ async function appendDoctorAuditLog(
     entityId: input.doctor.id,
     details: input.details
   });
+}
+
+async function findDoctorGroupById(
+  doctorGroupRepository: DoctorGroupRepository,
+  groupId: EntityId | undefined
+): Promise<DoctorGroup | null> {
+  if (!groupId) {
+    return null;
+  }
+
+  const group = await doctorGroupRepository.findById(groupId);
+
+  if (!group) {
+    throw new DoctorValidationError(`Doctor group '${groupId}' was not found.`);
+  }
+
+  return group;
 }
 
 async function loadDoctorOrThrow(
@@ -235,6 +254,10 @@ export function createDoctorManagementService(
     },
     async createDoctor(input) {
       const normalizedInput = validateCreateDoctorInput(input);
+      const group = await findDoctorGroupById(
+        dependencies.doctorGroupRepository,
+        normalizedInput.groupId
+      );
       await assertUniqueIdentifierAvailable(
         dependencies.doctorRepository,
         normalizedInput.uniqueIdentifier
@@ -248,7 +271,7 @@ export function createDoctorManagementService(
         name: normalizedInput.name,
         phoneNumber: normalizedInput.phoneNumber,
         uniqueIdentifier: normalizedInput.uniqueIdentifier,
-        weekendGroup: normalizedInput.weekendGroup,
+        groupId: group?.id,
         isActive: true,
         createdAt: timestamp,
         updatedAt: timestamp
@@ -266,7 +289,8 @@ export function createDoctorManagementService(
         details: {
           doctorName: savedDoctor.name,
           uniqueIdentifier: savedDoctor.uniqueIdentifier,
-          weekendGroup: savedDoctor.weekendGroup,
+          groupId: savedDoctor.groupId ?? null,
+          groupName: group?.name ?? null,
           isActive: savedDoctor.isActive,
           passwordPlaceholderProvided: normalizedInput.temporaryPassword.length > 0
         }
@@ -277,6 +301,10 @@ export function createDoctorManagementService(
     async updateDoctor(doctorId, input) {
       const doctor = await loadDoctorOrThrow(dependencies.doctorRepository, doctorId);
       const normalizedInput = validateUpdateDoctorInput(input);
+      const group = await findDoctorGroupById(
+        dependencies.doctorGroupRepository,
+        normalizedInput.groupId
+      );
       await assertUniqueIdentifierAvailable(
         dependencies.doctorRepository,
         normalizedInput.uniqueIdentifier,
@@ -288,7 +316,7 @@ export function createDoctorManagementService(
         name: normalizedInput.name,
         phoneNumber: normalizedInput.phoneNumber,
         uniqueIdentifier: normalizedInput.uniqueIdentifier,
-        weekendGroup: normalizedInput.weekendGroup,
+        groupId: group?.id,
         updatedAt: new Date().toISOString()
       });
 
@@ -328,15 +356,21 @@ export function createDoctorManagementService(
         });
       }
 
-      if (doctor.weekendGroup !== updatedDoctor.weekendGroup) {
+      if (doctor.groupId !== updatedDoctor.groupId) {
+        const previousGroup = await findDoctorGroupById(
+          dependencies.doctorGroupRepository,
+          doctor.groupId
+        );
         await appendDoctorAuditLog(dependencies, {
           actorId: input.actorId,
           actorRole: input.actorRole,
-          actionType: "WEEKEND_GROUP_CHANGED",
+          actionType: "DOCTOR_GROUP_CHANGED",
           doctor: updatedDoctor,
           details: {
-            previousWeekendGroup: doctor.weekendGroup,
-            nextWeekendGroup: updatedDoctor.weekendGroup
+            previousGroupId: previousGroup?.id ?? null,
+            previousGroupName: previousGroup?.name ?? null,
+            nextGroupId: group?.id ?? null,
+            nextGroupName: group?.name ?? null
           }
         });
       }

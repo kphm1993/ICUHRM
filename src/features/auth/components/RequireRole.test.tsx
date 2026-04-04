@@ -145,6 +145,80 @@ describe("RequireRole", () => {
     expect(screen.queryByText("Roster Page")).not.toBeInTheDocument();
   });
 
+  it("redirects doctor users away from /admin/shift-types", () => {
+    renderRequireRoleRoute({
+      role: "DOCTOR",
+      initialEntry: "/admin/shift-types",
+      protectedPath: "/admin/shift-types",
+      protectedLabel: "Shift Types Page"
+    });
+
+    expect(screen.getByText("Roster Page")).toBeInTheDocument();
+    expect(screen.queryByText("Shift Types Page")).not.toBeInTheDocument();
+  });
+
+  it("allows admin users to access /admin/shift-types", () => {
+    renderRequireRoleRoute({
+      role: "ADMIN",
+      initialEntry: "/admin/shift-types",
+      protectedPath: "/admin/shift-types",
+      protectedLabel: "Shift Types Page"
+    });
+
+    expect(screen.getByText("Shift Types Page")).toBeInTheDocument();
+    expect(screen.queryByText("Roster Page")).not.toBeInTheDocument();
+  });
+
+  it("redirects doctor users away from /admin/duty-designs", () => {
+    renderRequireRoleRoute({
+      role: "DOCTOR",
+      initialEntry: "/admin/duty-designs",
+      protectedPath: "/admin/duty-designs",
+      protectedLabel: "Duty Designs Page"
+    });
+
+    expect(screen.getByText("Roster Page")).toBeInTheDocument();
+    expect(screen.queryByText("Duty Designs Page")).not.toBeInTheDocument();
+  });
+
+  it("allows admin users to access /admin/duty-designs", () => {
+    renderRequireRoleRoute({
+      role: "ADMIN",
+      initialEntry: "/admin/duty-designs",
+      protectedPath: "/admin/duty-designs",
+      protectedLabel: "Duty Designs Page"
+    });
+
+    expect(screen.getByText("Duty Designs Page")).toBeInTheDocument();
+    expect(screen.queryByText("Roster Page")).not.toBeInTheDocument();
+  });
+
+  it("redirects doctor users away from /admin/duty-design-assignments", () => {
+    renderRequireRoleRoute({
+      role: "DOCTOR",
+      initialEntry: "/admin/duty-design-assignments",
+      protectedPath: "/admin/duty-design-assignments",
+      protectedLabel: "Duty Design Assignments Page"
+    });
+
+    expect(screen.getByText("Roster Page")).toBeInTheDocument();
+    expect(
+      screen.queryByText("Duty Design Assignments Page")
+    ).not.toBeInTheDocument();
+  });
+
+  it("allows admin users to access /admin/duty-design-assignments", () => {
+    renderRequireRoleRoute({
+      role: "ADMIN",
+      initialEntry: "/admin/duty-design-assignments",
+      protectedPath: "/admin/duty-design-assignments",
+      protectedLabel: "Duty Design Assignments Page"
+    });
+
+    expect(screen.getByText("Duty Design Assignments Page")).toBeInTheDocument();
+    expect(screen.queryByText("Roster Page")).not.toBeInTheDocument();
+  });
+
   it("redirects doctor users away from /admin/bias-criteria", () => {
     renderRequireRoleRoute({
       role: "DOCTOR",

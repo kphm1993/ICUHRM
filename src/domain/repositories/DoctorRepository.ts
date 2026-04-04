@@ -3,6 +3,7 @@ import type { Doctor, EntityId, WeekendGroup } from "@/domain/models";
 export interface DoctorRepositoryFilter {
   readonly isActive?: boolean;
   readonly userId?: EntityId;
+  readonly groupId?: EntityId;
   readonly weekendGroup?: WeekendGroup;
 }
 

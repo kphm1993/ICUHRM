@@ -22,6 +22,10 @@ function addMissingWeekendScheduleIssue(
   shift: Shift,
   input: ValidateRosterInput
 ): void {
+  if (!input.weekendGroupSchedule?.length) {
+    return;
+  }
+
   if (shift.category !== "WEEKEND" && shift.special !== "FRIDAY_NIGHT") {
     return;
   }
@@ -111,10 +115,10 @@ export function validateGeneratedRoster(
     }
 
     const shiftAssignments = assignmentsByShift.get(shift.id) ?? [];
-    const weekendOffGroup = resolveWeekendOffGroupForShift(
-      shift,
-      input.weekendGroupSchedule
-    );
+    const weekendOffGroup = input.weekendGroupSchedule?.length
+      ? resolveWeekendOffGroupForShift(shift, input.weekendGroupSchedule)
+      : null;
+    const allowedGroupId = input.allowedDoctorGroupIdByDate[shift.date];
 
     for (const assignment of shiftAssignments) {
       const doctor = getDoctorById(input.doctors, getAssignmentDoctorId(assignment));
@@ -160,6 +164,16 @@ export function validateGeneratedRoster(
           doctorId: doctor.id
         });
       }
+
+      if (allowedGroupId && doctor.groupId !== allowedGroupId) {
+        issues.push({
+          code: "ASSIGNMENT_GROUP_CONSTRAINT_VIOLATION",
+          message: `Doctor ${doctor.id} is assigned to shift ${shift.id} on ${shift.date} outside the allowed doctor group constraint.`,
+          shiftId: shift.id,
+          assignmentId: assignment.id,
+          doctorId: doctor.id
+        });
+      }
     }
   }
 
@@ -182,10 +196,10 @@ export function validateGeneratedRoster(
     {
       readonly doctorId: EntityId;
       readonly date: string;
-      dayAssignment?: Assignment;
-      nightAssignment?: Assignment;
-      dayShift?: Shift;
-      nightShift?: Shift;
+      readonly entries: Array<{
+        readonly assignment: Assignment;
+        readonly shift: Shift;
+      }>;
     }
   >();
 
@@ -200,35 +214,31 @@ export function validateGeneratedRoster(
     const key = `${doctorId}:${shift.date}`;
     const existingEntry = assignmentsByDoctorDate.get(key) ?? {
       doctorId,
-      date: shift.date
+      date: shift.date,
+      entries: []
     };
 
-    if (shift.type === "DAY") {
-      existingEntry.dayAssignment = assignment;
-      existingEntry.dayShift = shift;
-    }
-
-    if (shift.type === "NIGHT") {
-      existingEntry.nightAssignment = assignment;
-      existingEntry.nightShift = shift;
-    }
+    existingEntry.entries.push({
+      assignment,
+      shift
+    });
 
     assignmentsByDoctorDate.set(key, existingEntry);
   }
 
   for (const entry of assignmentsByDoctorDate.values()) {
-    if (
-      !entry.dayAssignment ||
-      !entry.nightAssignment ||
-      !entry.dayShift ||
-      !entry.nightShift
-    ) {
+    if (entry.entries.length <= 1) {
       continue;
     }
 
+    const conflictingShiftIds = entry.entries.map((currentEntry) => currentEntry.shift.id);
+    const conflictingAssignmentIds = entry.entries.map(
+      (currentEntry) => currentEntry.assignment.id
+    );
+
     issues.push({
       code: "ASSIGNMENT_SAME_DAY_CONFLICT",
-      message: `Doctor ${entry.doctorId} is assigned to both ${entry.dayShift.id} and ${entry.nightShift.id} on ${entry.date}. Assignments ${entry.dayAssignment.id} and ${entry.nightAssignment.id} violate the one-shift-per-day rule.`,
+      message: `Doctor ${entry.doctorId} has multiple day/night assignments on ${entry.date}. Shifts ${conflictingShiftIds.join(", ")} and assignments ${conflictingAssignmentIds.join(", ")} violate the one-shift-per-day rule.`,
       doctorId: entry.doctorId
     });
   }

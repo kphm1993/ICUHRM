@@ -3,7 +3,10 @@ import type {
   ShiftTypeRepository,
   ShiftTypeRepositoryFilter
 } from "@/domain/repositories";
-import { RepositoryConflictError } from "@/domain/repositories";
+import {
+  RepositoryConflictError,
+  RepositoryNotFoundError
+} from "@/domain/repositories";
 
 function cloneShiftType(shiftType: ShiftType): ShiftType {
   return { ...shiftType };
@@ -30,7 +33,55 @@ export class InMemoryShiftTypeRepository implements ShiftTypeRepository {
     }
   }
 
-  async list(filter?: ShiftTypeRepositoryFilter): Promise<ReadonlyArray<ShiftType>> {
+  async create(shiftType: ShiftType): Promise<ShiftType> {
+    this.assertUniqueConstraints(shiftType);
+    this.shiftTypesById.set(shiftType.id, cloneShiftType(shiftType));
+    return cloneShiftType(shiftType);
+  }
+
+  async update(
+    id: string,
+    changes: Partial<ShiftType>
+  ): Promise<ShiftType> {
+    const existingShiftType = this.shiftTypesById.get(id);
+
+    if (!existingShiftType) {
+      throw new RepositoryNotFoundError(`Shift type '${id}' was not found.`);
+    }
+
+    const nextShiftType: ShiftType = {
+      ...existingShiftType,
+      ...changes,
+      id: existingShiftType.id,
+      createdAt: existingShiftType.createdAt,
+      updatedAt: changes.updatedAt ?? new Date().toISOString()
+    };
+
+    this.assertUniqueConstraints(nextShiftType);
+    this.shiftTypesById.set(id, cloneShiftType(nextShiftType));
+    return cloneShiftType(nextShiftType);
+  }
+
+  async delete(id: string): Promise<void> {
+    const wasDeleted = this.shiftTypesById.delete(id);
+
+    if (!wasDeleted) {
+      throw new RepositoryNotFoundError(`Shift type '${id}' was not found.`);
+    }
+  }
+
+  async listActive(
+    filter?: Omit<ShiftTypeRepositoryFilter, "isActive">
+  ): Promise<ReadonlyArray<ShiftType>> {
+    return this.listAll({
+      ...filter,
+      isActive: true
+    });
+  }
+
+  async listAll(
+    filter?: ShiftTypeRepositoryFilter
+  ): Promise<ReadonlyArray<ShiftType>> {
     const shiftTypes = Array.from(this.shiftTypesById.values()).filter((shiftType) => {
       if (
         filter?.isActive !== undefined &&
@@ -40,8 +91,8 @@ export class InMemoryShiftTypeRepository implements ShiftTypeRepository {
       }
 
       if (
-        filter?.defaultKind !== undefined &&
-        shiftType.defaultKind !== filter.defaultKind
+        filter?.category !== undefined &&
+        shiftType.category !== filter.category
       ) {
         return false;
       }
@@ -52,23 +103,9 @@ export class InMemoryShiftTypeRepository implements ShiftTypeRepository {
     return sortShiftTypes(shiftTypes).map(cloneShiftType);
   }
 
-  async findById(id: string): Promise<ShiftType | null> {
+  async getById(id: string): Promise<ShiftType | null> {
     const shiftType = this.shiftTypesById.get(id);
     return shiftType ? cloneShiftType(shiftType) : null;
-  }
-
-  async findByCode(code: string): Promise<ShiftType | null> {
-    const shiftType = Array.from(this.shiftTypesById.values()).find(
-      (entry) => entry.code === code
-    );
-
-    return shiftType ? cloneShiftType(shiftType) : null;
-  }
-
-  async save(shiftType: ShiftType): Promise<ShiftType> {
-    this.assertUniqueConstraints(shiftType);
-    this.shiftTypesById.set(shiftType.id, cloneShiftType(shiftType));
-    return cloneShiftType(shiftType);
   }
 
   private assertUniqueConstraints(candidate: ShiftType): void {
@@ -85,4 +122,3 @@ export class InMemoryShiftTypeRepository implements ShiftTypeRepository {
     }
   }
 }
-

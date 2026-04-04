@@ -3,6 +3,9 @@ import type {
   BiasCriteria,
   BiasLedger,
   Doctor,
+  DoctorGroup,
+  DutyDesign,
+  DutyDesignAssignment,
   DutyLocation,
   Leave,
   OffRequest,
@@ -23,7 +26,6 @@ export const ROSTER_SEED_DOCTORS: ReadonlyArray<Doctor> = [
     name: "Dr. Nila Perera",
     phoneNumber: "0710000001",
     uniqueIdentifier: "nila.perera",
-    weekendGroup: "A",
     isActive: true,
     createdAt: NOW,
     updatedAt: NOW
@@ -34,7 +36,6 @@ export const ROSTER_SEED_DOCTORS: ReadonlyArray<Doctor> = [
     name: "Dr. Anjana Kumara",
     phoneNumber: "0710000002",
     uniqueIdentifier: "anjana.kumara",
-    weekendGroup: "B",
     isActive: true,
     createdAt: NOW,
     updatedAt: NOW
@@ -45,7 +46,6 @@ export const ROSTER_SEED_DOCTORS: ReadonlyArray<Doctor> = [
     name: "Dr. Minali Fonseka",
     phoneNumber: "0710000003",
     uniqueIdentifier: "minali.fonseka",
-    weekendGroup: "A",
     isActive: true,
     createdAt: NOW,
     updatedAt: NOW
@@ -56,7 +56,6 @@ export const ROSTER_SEED_DOCTORS: ReadonlyArray<Doctor> = [
     name: "Dr. Ruwan Jayasena",
     phoneNumber: "0710000004",
     uniqueIdentifier: "ruwan.jayasena",
-    weekendGroup: "B",
     isActive: true,
     createdAt: NOW,
     updatedAt: NOW
@@ -67,12 +66,13 @@ export const ROSTER_SEED_DOCTORS: ReadonlyArray<Doctor> = [
     name: "Dr. Ishara Fernando",
     phoneNumber: "0710000005",
     uniqueIdentifier: "ishara.fernando",
-    weekendGroup: "A",
     isActive: false,
     createdAt: NOW,
     updatedAt: NOW
   }
 ];
+
+export const ROSTER_SEED_DOCTOR_GROUPS: ReadonlyArray<DoctorGroup> = [];
 
 export const ROSTER_SEED_SHIFT_TYPES: ReadonlyArray<ShiftType> = [
   {
@@ -81,7 +81,7 @@ export const ROSTER_SEED_SHIFT_TYPES: ReadonlyArray<ShiftType> = [
     label: "Day",
     startTime: "08:00",
     endTime: "20:00",
-    defaultKind: "DAY",
+    category: "DAY",
     isActive: true,
     createdAt: NOW,
     updatedAt: NOW
@@ -92,7 +92,7 @@ export const ROSTER_SEED_SHIFT_TYPES: ReadonlyArray<ShiftType> = [
     label: "Night",
     startTime: "20:00",
     endTime: "08:00",
-    defaultKind: "NIGHT",
+    category: "NIGHT",
     isActive: true,
     createdAt: NOW,
     updatedAt: NOW
@@ -112,6 +112,9 @@ export const ROSTER_SEED_DUTY_LOCATIONS: ReadonlyArray<DutyLocation> = [
 ];
 
 export const ROSTER_SEED_BIAS_CRITERIA: ReadonlyArray<BiasCriteria> = [];
+export const ROSTER_SEED_DUTY_DESIGNS: ReadonlyArray<DutyDesign> = [];
+export const ROSTER_SEED_DUTY_DESIGN_ASSIGNMENTS: ReadonlyArray<DutyDesignAssignment> =
+  [];
 
 export const ROSTER_SEED_LEAVES: ReadonlyArray<Leave> = [
   {

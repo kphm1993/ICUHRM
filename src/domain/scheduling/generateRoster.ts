@@ -1,10 +1,11 @@
 import type {
   Assignment,
-  BiasLedger,
   BiasCriteria,
+  BiasLedger,
   Doctor,
   DutyLocation,
   EntityId,
+  ISODateString,
   Shift,
   ShiftType,
   YearMonthString
@@ -14,8 +15,14 @@ import {
   roundBiasValue
 } from "@/domain/scheduling/biasBuckets";
 import { DEFAULT_SCHEDULING_ENGINE_CONFIG } from "@/domain/scheduling/config";
-import type { GenerateRosterInput, GenerateRosterOutput } from "@/domain/scheduling/contracts";
+import type {
+  BlockedDatesByDoctorId,
+  GenerateRosterInput,
+  GenerateRosterOutput,
+  GeneratedShiftMetadata
+} from "@/domain/scheduling/contracts";
 import { checkShiftEligibility } from "@/domain/scheduling/checkEligibility";
+import { addDays, parseIsoDate, toIsoDate } from "@/domain/scheduling/dateUtils";
 import { determineBiasCriteriaForShift } from "@/domain/scheduling/determineBiasCriteria";
 import { compareShiftsForAssignment } from "@/domain/scheduling/shiftClassification";
 import {
@@ -71,12 +78,6 @@ function assertCriteriaConfigurationIsValid(input: GenerateRosterInput): void {
     );
   }
 
-  if (input.activeDutyLocations.length !== 1) {
-    throw new Error(
-      "Phase 3 roster generation requires exactly one active duty location."
-    );
-  }
-
   const activeLocationIds = new Set(
     input.activeDutyLocations
       .filter((location) => location.isActive)
@@ -86,9 +87,9 @@ function assertCriteriaConfigurationIsValid(input: GenerateRosterInput): void {
     input.shiftTypes.filter((shiftType) => shiftType.isActive).map((shiftType) => shiftType.id)
   );
 
-  if (!activeLocationIds.has(input.generationLocationId)) {
+  if (!activeLocationIds.has(input.fallbackLocationId)) {
     throw new Error(
-      `Generation location '${input.generationLocationId}' is not an active duty location.`
+      `Fallback location '${input.fallbackLocationId}' is not an active duty location.`
     );
   }
 
@@ -115,6 +116,39 @@ function assertCriteriaConfigurationIsValid(input: GenerateRosterInput): void {
       }
     }
   }
+}
+
+function getBlockedDatesSnapshot(
+  blockedDatesByDoctorId: ReadonlyMap<EntityId, Set<ISODateString>>
+): BlockedDatesByDoctorId {
+  return new Map(
+    Array.from(blockedDatesByDoctorId.entries()).map(([doctorId, blockedDates]) => [
+      doctorId,
+      new Set(blockedDates)
+    ])
+  );
+}
+
+function applyDutyDesignOffOffset(input: {
+  readonly blockedDatesByDoctorId: Map<EntityId, Set<ISODateString>>;
+  readonly doctorId: EntityId;
+  readonly shift: Shift;
+  readonly shiftMetadata: GeneratedShiftMetadata | undefined;
+}): void {
+  const offOffsetDays = input.shiftMetadata?.offOffsetDays;
+
+  if (offOffsetDays === undefined || offOffsetDays < 0) {
+    return;
+  }
+
+  const blockedDate = toIsoDate(
+    addDays(parseIsoDate(input.shift.date), offOffsetDays)
+  );
+  const blockedDates =
+    input.blockedDatesByDoctorId.get(input.doctorId) ?? new Set<ISODateString>();
+
+  blockedDates.add(blockedDate);
+  input.blockedDatesByDoctorId.set(input.doctorId, blockedDates);
 }
 
 function computeUpdatedBiasLedger(
@@ -196,20 +230,27 @@ export function generateRoster(
   const doctorsById = indexEntriesById(input.doctors);
   const shiftTypesById = indexEntriesById(input.shiftTypes);
   const dutyLocationsById = indexEntriesById(input.activeDutyLocations);
+  const blockedDatesByDoctorId = new Map<EntityId, Set<ISODateString>>();
   let fairnessState = initializeFairnessWorkingState({
     doctors: input.doctors,
     criteriaIds: input.activeBiasCriteria.map((criteria) => criteria.id)
   });
 
-  const shifts = [...generateShiftPool({
+  const shiftPool = generateShiftPool({
     rosterId: input.rosterId,
     range: input.range,
     shiftTypes: input.shiftTypes,
-    generationLocationId: input.generationLocationId,
+    dutyDesigns: input.dutyDesigns,
+    dutyDesignAssignments: input.dutyDesignAssignments,
+    publicHolidayDates: input.publicHolidayDates,
+    activeDutyLocations: input.activeDutyLocations,
+    fallbackLocationId: input.fallbackLocationId,
     weekendGroupSchedule: input.weekendGroupSchedule
-  })].sort(compareShiftsForAssignment);
+  });
+  const shifts = [...shiftPool.shifts].sort(compareShiftsForAssignment);
   const shiftsById = new Map(shifts.map((shift) => [shift.id, shift] as const));
   const criteriaIdsByShiftId = new Map<EntityId, ReadonlyArray<EntityId>>();
+  shiftPool.warnings.forEach((warning) => warnings.add(warning));
 
   if (toYearMonthString(input.range.startDate) !== toYearMonthString(input.range.endDate)) {
     warnings.add(
@@ -224,7 +265,10 @@ export function generateRoster(
       leaves: input.leaves,
       currentAssignments: assignments,
       shiftsById,
-        weekendGroupSchedule: input.weekendGroupSchedule
+      shiftMetadataById: shiftPool.shiftMetadataById,
+      blockedDatesByDoctorId: getBlockedDatesSnapshot(blockedDatesByDoctorId),
+      allowedDoctorGroupIdByDate: input.allowedDoctorGroupIdByDate,
+      weekendGroupSchedule: input.weekendGroupSchedule
     });
     const shiftType = shiftTypesById[shift.shiftTypeId] as ShiftType | undefined;
     const location = dutyLocationsById[shift.locationId] as DutyLocation | undefined;
@@ -283,6 +327,12 @@ export function generateRoster(
     }
 
     assignments.push(createAssignment(shift, selectedDoctor.id, generatedAt));
+    applyDutyDesignOffOffset({
+      blockedDatesByDoctorId,
+      doctorId: selectedDoctor.id,
+      shift,
+      shiftMetadata: shiftPool.shiftMetadataById.get(shift.id)
+    });
     fairnessState = recordAssignmentForShift(
       fairnessState,
       selectedDoctor.id,
@@ -311,6 +361,7 @@ export function generateRoster(
     updatedBias,
     activeBiasCriteria: input.activeBiasCriteria,
     activeDutyLocations: input.activeDutyLocations,
+    allowedDoctorGroupIdByDate: input.allowedDoctorGroupIdByDate,
     weekendGroupSchedule: input.weekendGroupSchedule
   });
 

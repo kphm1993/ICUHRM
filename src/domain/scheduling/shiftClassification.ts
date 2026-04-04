@@ -10,7 +10,7 @@ export function resolveShiftSpecialFlag(
   shiftType: ShiftType
 ): ShiftSpecialFlag {
   const dayOfWeek = getDayOfWeek(date);
-  return dayOfWeek === 5 && shiftType.defaultKind === "NIGHT"
+  return dayOfWeek === 5 && shiftType.category === "NIGHT"
     ? "FRIDAY_NIGHT"
     : "NONE";
 }
@@ -34,8 +34,14 @@ export function resolveGroupEligibility(
 }
 
 export function compareShiftsForAssignment(
-  left: Pick<Shift, "category" | "special" | "date" | "startTime" | "definitionSnapshot">,
-  right: Pick<Shift, "category" | "special" | "date" | "startTime" | "definitionSnapshot">
+  left: Pick<
+    Shift,
+    "id" | "category" | "special" | "date" | "startTime" | "definitionSnapshot"
+  >,
+  right: Pick<
+    Shift,
+    "id" | "category" | "special" | "date" | "startTime" | "definitionSnapshot"
+  >
 ): number {
   const leftRestricted = isRestrictedShift(left) ? 0 : 1;
   const rightRestricted = isRestrictedShift(right) ? 0 : 1;
@@ -54,5 +60,11 @@ export function compareShiftsForAssignment(
     return startTimeComparison;
   }
 
-  return left.definitionSnapshot.code.localeCompare(right.definitionSnapshot.code);
+  const definitionComparison = left.definitionSnapshot.code.localeCompare(
+    right.definitionSnapshot.code
+  );
+
+  return definitionComparison !== 0
+    ? definitionComparison
+    : left.id.localeCompare(right.id);
 }

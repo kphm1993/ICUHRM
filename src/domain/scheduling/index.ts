@@ -5,6 +5,7 @@ export * from "@/domain/scheduling/biasBuckets";
 export * from "@/domain/scheduling/determineBiasCriteria";
 export * from "@/domain/scheduling/fairnessState";
 export * from "@/domain/scheduling/eligibilityRules";
+export * from "@/domain/scheduling/dutyDesignPlanning";
 export * from "@/domain/scheduling/generateShiftPool";
 export * from "@/domain/scheduling/checkEligibility";
 export * from "@/domain/scheduling/scoreCandidates";

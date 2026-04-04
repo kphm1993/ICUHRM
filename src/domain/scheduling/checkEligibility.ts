@@ -3,12 +3,12 @@ import type {
   EligibilityDecision
 } from "@/domain/scheduling/contracts";
 import {
-  evaluateFridayNightRule,
+  evaluateAllowedDoctorGroupRule,
+  evaluateDutyDesignBlockedDayRule,
   evaluateInactiveDoctorRule,
   evaluateLeaveRule,
   evaluateOneShiftPerDayRule,
-  evaluateRestAfterNightShiftRule,
-  evaluateWeekendGroupRule
+  evaluateRestAfterNightShiftRule
 } from "@/domain/scheduling/eligibilityRules";
 
 export function checkShiftEligibility(
@@ -27,22 +27,22 @@ export function checkShiftEligibility(
       reasons.push(leaveReason);
     }
 
-    const weekendReason = evaluateWeekendGroupRule(
+    const blockedDayReason = evaluateDutyDesignBlockedDayRule(
       doctor,
       input.shift,
-      input.weekendGroupSchedule
+      input.blockedDatesByDoctorId
     );
-    if (weekendReason) {
-      reasons.push(weekendReason);
+    if (blockedDayReason) {
+      reasons.push(blockedDayReason);
     }
 
-    const fridayNightReason = evaluateFridayNightRule(
+    const allowedGroupReason = evaluateAllowedDoctorGroupRule(
       doctor,
       input.shift,
-      input.weekendGroupSchedule
+      input.allowedDoctorGroupIdByDate
     );
-    if (fridayNightReason) {
-      reasons.push(fridayNightReason);
+    if (allowedGroupReason) {
+      reasons.push(allowedGroupReason);
     }
 
     const oneShiftPerDayReason = evaluateOneShiftPerDayRule(

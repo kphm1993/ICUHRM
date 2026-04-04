@@ -16,6 +16,13 @@ export class RepositoryNotFoundError extends Error {
   }
 }
 
+export class EntityInUseError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "EntityInUseError";
+  }
+}
+
 export class CriteriaInUseError extends Error {
   constructor(message: string) {
     super(message);

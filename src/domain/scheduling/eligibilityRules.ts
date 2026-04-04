@@ -1,11 +1,13 @@
 import type {
   Assignment,
+  EntityId,
   Doctor,
   Leave,
   Shift,
   WeekendGroup,
   WeekendGroupScheduleEntry
 } from "@/domain/models";
+import type { BlockedDatesByDoctorId } from "@/domain/scheduling/contracts";
 import {
   addDays,
   getWeekendStartDate,
@@ -68,6 +70,22 @@ export function evaluateLeaveRule(
   return findDoctorLeaveForShift(doctor, shift, leaves)
     ? "Doctor is on leave for this shift date."
     : null;
+}
+
+export function evaluateAllowedDoctorGroupRule(
+  doctor: Pick<Doctor, "groupId">,
+  shift: Pick<Shift, "date">,
+  allowedDoctorGroupIdByDate: Readonly<Record<string, EntityId>>
+): string | null {
+  const allowedGroupId = allowedDoctorGroupIdByDate[shift.date];
+
+  if (!allowedGroupId) {
+    return null;
+  }
+
+  return doctor.groupId === allowedGroupId
+    ? null
+    : "Doctor does not belong to the allowed group for this date.";
 }
 
 export function evaluateWeekendGroupRule(
@@ -139,7 +157,7 @@ export function evaluateOneShiftPerDayRule(
       return false;
     }
 
-    return assignedShift.type !== shift.type;
+    return true;
   });
 
   if (!conflictingAssignment) {
@@ -155,6 +173,20 @@ export function evaluateOneShiftPerDayRule(
         : "same-day";
 
   return `Doctor already has a ${conflictingShiftLabel} shift assignment on ${shift.date}.`;
+}
+
+export function evaluateDutyDesignBlockedDayRule(
+  doctor: Pick<Doctor, "id">,
+  shift: Pick<Shift, "date">,
+  blockedDatesByDoctorId: BlockedDatesByDoctorId
+): string | null {
+  const blockedDates = blockedDatesByDoctorId.get(doctor.id);
+
+  if (!blockedDates?.has(shift.date)) {
+    return null;
+  }
+
+  return "Doctor is blocked on this date by a duty-design off-offset rule.";
 }
 
 export function evaluateRestAfterNightShiftRule(

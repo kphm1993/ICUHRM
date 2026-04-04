@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { RosterSnapshot } from "@/domain/models";
+import { DEFAULT_DUTY_LOCATION_ID, type RosterSnapshot } from "@/domain/models";
 import { RosterLifecycleActions } from "@/features/roster/components/RosterLifecycleActions";
 
 const baseSnapshot: RosterSnapshot = {
@@ -41,7 +41,13 @@ const baseSnapshot: RosterSnapshot = {
     firstWeekendOffGroup: "A",
     weekendGroupSchedule: [],
     activeBiasCriteria: [],
-    activeDutyLocations: []
+    activeDutyLocations: [],
+    doctorGroupSnapshot: {},
+    allowedDoctorGroupIdByDate: {},
+    dutyDesignAssignments: {},
+    dutyDesignSnapshot: {},
+    publicHolidayDates: [],
+    fallbackLocationId: DEFAULT_DUTY_LOCATION_ID
   }
 };
 
