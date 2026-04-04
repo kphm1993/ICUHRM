@@ -4,6 +4,7 @@ import type {
   BiasLedger,
   Doctor,
   DoctorGroup,
+  GroupConstraintTemplate,
   DutyDesign,
   DutyDesignAssignment,
   DutyLocation,
@@ -73,6 +74,8 @@ export const ROSTER_SEED_DOCTORS: ReadonlyArray<Doctor> = [
 ];
 
 export const ROSTER_SEED_DOCTOR_GROUPS: ReadonlyArray<DoctorGroup> = [];
+export const ROSTER_SEED_GROUP_CONSTRAINT_TEMPLATES: ReadonlyArray<GroupConstraintTemplate> =
+  [];
 
 export const ROSTER_SEED_SHIFT_TYPES: ReadonlyArray<ShiftType> = [
   {

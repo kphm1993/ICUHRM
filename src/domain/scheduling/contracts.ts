@@ -19,6 +19,8 @@ import type {
 } from "@/domain/models";
 import type { SchedulingEngineConfig } from "@/domain/scheduling/config";
 
+export type { AllowedDoctorGroupIdByDate } from "@/domain/models";
+
 export type CriteriaCountMap = Readonly<Record<EntityId, number>>;
 export type ShiftPoolSource =
   | "DUTY_DESIGN_STANDARD"
@@ -28,6 +30,10 @@ export type ShiftPoolSource =
 export type BlockedDatesByDoctorId = ReadonlyMap<
   EntityId,
   ReadonlySet<ISODateString>
+>;
+export type ExcludedDoctorsByDate = ReadonlyMap<
+  ISODateString,
+  ReadonlySet<EntityId>
 >;
 
 export interface GeneratedShiftMetadata {
@@ -64,6 +70,7 @@ export type ValidationIssueCode =
   | "SHIFT_UNASSIGNED"
   | "SHIFT_MULTI_ASSIGNED"
   | "ASSIGNMENT_ON_LEAVE"
+  | "ASSIGNMENT_DOCTOR_EXCLUDED"
   | "ASSIGNMENT_SAME_DAY_CONFLICT"
   | "ASSIGNMENT_REST_AFTER_NIGHT_VIOLATION"
   | "ASSIGNMENT_GROUP_CONSTRAINT_VIOLATION"
@@ -101,6 +108,7 @@ export interface GenerateRosterInput {
   readonly activeDutyLocations: ReadonlyArray<DutyLocation>;
   readonly fallbackLocationId: EntityId;
   readonly allowedDoctorGroupIdByDate: AllowedDoctorGroupIdByDate;
+  readonly excludedDoctorsByDate?: ExcludedDoctorsByDate;
   readonly weekendGroupSchedule?: ReadonlyArray<WeekendGroupScheduleEntry>;
   readonly generatedByActorId: EntityId;
   readonly config?: SchedulingEngineConfig;
@@ -147,6 +155,7 @@ export interface CheckEligibilityInput {
   readonly shiftMetadataById: ReadonlyMap<EntityId, GeneratedShiftMetadata>;
   readonly blockedDatesByDoctorId: BlockedDatesByDoctorId;
   readonly allowedDoctorGroupIdByDate: AllowedDoctorGroupIdByDate;
+  readonly excludedDoctorsByDate?: ExcludedDoctorsByDate;
   readonly weekendGroupSchedule?: ReadonlyArray<WeekendGroupScheduleEntry>;
 }
 
@@ -185,5 +194,6 @@ export interface ValidateRosterInput {
   readonly activeBiasCriteria: ReadonlyArray<BiasCriteria>;
   readonly activeDutyLocations: ReadonlyArray<DutyLocation>;
   readonly allowedDoctorGroupIdByDate: AllowedDoctorGroupIdByDate;
+  readonly excludedDoctorsByDate?: ExcludedDoctorsByDate;
   readonly weekendGroupSchedule?: ReadonlyArray<WeekendGroupScheduleEntry>;
 }

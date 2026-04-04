@@ -2,6 +2,7 @@ import type { Assignment, Doctor, EntityId, Shift } from "@/domain/models";
 import type { ValidateRosterInput, ValidationIssue, ValidationResult } from "@/domain/scheduling/contracts";
 import { addDays, parseIsoDate, toIsoDate } from "@/domain/scheduling/dateUtils";
 import {
+  evaluateDoctorExclusionRule,
   evaluateLeaveRule,
   resolveWeekendOffGroupForShift
 } from "@/domain/scheduling/eligibilityRules";
@@ -131,6 +132,16 @@ export function validateGeneratedRoster(
         issues.push({
           code: "ASSIGNMENT_ON_LEAVE",
           message: `Doctor ${doctor.id} is assigned to shift ${shift.id} while on leave.`,
+          shiftId: shift.id,
+          assignmentId: assignment.id,
+          doctorId: doctor.id
+        });
+      }
+
+      if (evaluateDoctorExclusionRule(doctor, shift, input.excludedDoctorsByDate ?? new Map())) {
+        issues.push({
+          code: "ASSIGNMENT_DOCTOR_EXCLUDED",
+          message: `Doctor ${doctor.id} is assigned to shift ${shift.id} on ${shift.date} despite an exclusion rule on that date.`,
           shiftId: shift.id,
           assignmentId: assignment.id,
           doctorId: doctor.id

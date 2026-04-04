@@ -473,10 +473,14 @@ async function loadSourceData(
   const shiftTypes = await dependencies.shiftTypeManagementService.listShiftTypes({
     isActive: true
   });
-  const currentBias =
-    await dependencies.biasManagementService.listBiasLedgers(rosterMonth);
-  const currentWeekdayPairBias =
-    await dependencies.biasManagementService.listWeekdayPairBiasLedgers(rosterMonth);
+  const currentBias = await loadMostRecentBias(
+    dependencies.biasManagementService,
+    rosterMonth
+  );
+  const currentWeekdayPairBias = await loadMostRecentWeekdayPairBias(
+    dependencies.biasManagementService,
+    rosterMonth
+  );
 
   return {
     range,
@@ -512,6 +516,45 @@ function resolveFallbackLocationId(
   }
 
   return fallbackLocation.id;
+}
+
+function getPreviousMonth(yearMonth: YearMonthString): YearMonthString {
+  const [year, month] = yearMonth.split('-').map(Number);
+  const prevMonth = month === 1 ? 12 : month - 1;
+  const prevYear = month === 1 ? year - 1 : year;
+  return `${prevYear}-${prevMonth.toString().padStart(2, '0')}` as YearMonthString;
+}
+
+async function loadMostRecentBias(
+  biasManagementService: BiasManagementService,
+  rosterMonth: YearMonthString,
+  maxLookbackMonths = 12
+): Promise<ReadonlyArray<BiasLedger>> {
+  let currentMonth = rosterMonth;
+  for (let i = 0; i < maxLookbackMonths; i++) {
+    const bias = await biasManagementService.listBiasLedgers(currentMonth);
+    if (bias.length > 0) {
+      return bias;
+    }
+    currentMonth = getPreviousMonth(currentMonth);
+  }
+  return [];
+}
+
+async function loadMostRecentWeekdayPairBias(
+  biasManagementService: BiasManagementService,
+  rosterMonth: YearMonthString,
+  maxLookbackMonths = 12
+): Promise<ReadonlyArray<WeekdayPairBiasLedger>> {
+  let currentMonth = rosterMonth;
+  for (let i = 0; i < maxLookbackMonths; i++) {
+    const bias = await biasManagementService.listWeekdayPairBiasLedgers(currentMonth);
+    if (bias.length > 0) {
+      return bias;
+    }
+    currentMonth = getPreviousMonth(currentMonth);
+  }
+  return [];
 }
 
 function ensureVisibleRosterSnapshot(

@@ -5,6 +5,7 @@ import {
   ROSTER_SEED_BIAS_LEDGERS,
   ROSTER_SEED_DOCTORS,
   ROSTER_SEED_DOCTOR_GROUPS,
+  ROSTER_SEED_GROUP_CONSTRAINT_TEMPLATES,
   ROSTER_SEED_DUTY_DESIGNS,
   ROSTER_SEED_DUTY_DESIGN_ASSIGNMENTS,
   ROSTER_SEED_DUTY_LOCATIONS,
@@ -24,6 +25,7 @@ import { createDutyDesignManagementService } from "@/features/dutyDesigns/servic
 import { createBiasManagementService } from "@/features/fairness/services/biasManagementService";
 import { createLeaveManagementService } from "@/features/leaves/services/leaveManagementService";
 import { createOffRequestService } from "@/features/offRequests/services/offRequestService";
+import { createGroupConstraintTemplateManagementService } from "@/features/roster/services/groupConstraintTemplateManagementService";
 import { createRosterWorkflowService } from "@/features/roster/services/rosterWorkflowService";
 import { createRosterWizardService } from "@/features/roster/services/rosterWizardService";
 import { createShiftTypeManagementService } from "@/features/shifts/services/shiftTypeManagementService";
@@ -39,6 +41,7 @@ import {
   LocalStorageDutyDesignAssignmentRepository,
   LocalStorageDutyDesignRepository,
   LocalStorageDutyLocationRepository,
+  LocalStorageGroupConstraintTemplateRepository,
   LocalStorageOffRequestRepository,
   LocalStorageRosterSnapshotRepository,
   LocalStorageRosterWizardDraftRepository,
@@ -55,6 +58,9 @@ export interface AppServices {
   readonly doctorManagementService: ReturnType<typeof createDoctorManagementService>;
   readonly doctorGroupManagementService: ReturnType<
     typeof createDoctorGroupManagementService
+  >;
+  readonly groupConstraintTemplateManagementService: ReturnType<
+    typeof createGroupConstraintTemplateManagementService
   >;
   readonly dutyDesignAssignmentService: ReturnType<
     typeof createDutyDesignAssignmentService
@@ -79,6 +85,9 @@ function createAppRepositories() {
     }),
     doctorGroupRepository: new LocalStorageDoctorGroupRepository({
       seedData: ROSTER_SEED_DOCTOR_GROUPS
+    }),
+    groupConstraintTemplateRepository: new LocalStorageGroupConstraintTemplateRepository({
+      seedData: ROSTER_SEED_GROUP_CONSTRAINT_TEMPLATES
     }),
     shiftTypeRepository: new LocalStorageShiftTypeRepository({
       seedData: ROSTER_SEED_SHIFT_TYPES
@@ -144,6 +153,12 @@ function createAppServices(): AppServices {
     rosterSnapshotRepository: repositories.rosterSnapshotRepository,
     auditLogService
   });
+  const groupConstraintTemplateManagementService =
+    createGroupConstraintTemplateManagementService({
+      groupConstraintTemplateRepository: repositories.groupConstraintTemplateRepository,
+      doctorGroupRepository: repositories.doctorGroupRepository,
+      auditLogService
+    });
   const dutyDesignManagementService = createDutyDesignManagementService({
     dutyDesignRepository: repositories.dutyDesignRepository,
     dutyDesignAssignmentRepository: repositories.dutyDesignAssignmentRepository,
@@ -198,6 +213,14 @@ function createAppServices(): AppServices {
   });
   const rosterWizardService = createRosterWizardService({
     rosterWizardDraftRepository: repositories.rosterWizardDraftRepository,
+    doctorRepository: repositories.doctorRepository,
+    groupConstraintTemplateRepository: repositories.groupConstraintTemplateRepository,
+    dutyDesignRepository: repositories.dutyDesignRepository,
+    biasCriteriaManagementService,
+    dutyLocationManagementService,
+    shiftTypeManagementService,
+    leaveManagementService,
+    offRequestService,
     biasManagementService,
     auditLogService
   });
@@ -208,6 +231,7 @@ function createAppServices(): AppServices {
     biasCriteriaManagementService,
     doctorGroupManagementService,
     doctorManagementService,
+    groupConstraintTemplateManagementService,
     dutyDesignAssignmentService,
     dutyDesignManagementService,
     dutyLocationManagementService,

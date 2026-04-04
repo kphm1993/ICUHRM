@@ -46,6 +46,7 @@ export interface RosterWizardDraft {
   readonly excludedDoctorPeriods: ReadonlyArray<DoctorExclusionPeriod>;
   readonly dutyDesignAssignments: ReadonlyArray<DutyDesignAssignment>;
   readonly manualShiftAssignments: ReadonlyArray<ManualShiftAssignment>;
+  readonly baseBiasSnapshot: ReadonlyArray<BiasLedger>;
   readonly currentBiasSnapshot: ReadonlyArray<BiasLedger>;
   readonly status: RosterWizardDraftStatus;
   readonly currentStep: RosterWizardStep;

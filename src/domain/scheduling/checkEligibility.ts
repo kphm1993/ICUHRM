@@ -4,6 +4,7 @@ import type {
 } from "@/domain/scheduling/contracts";
 import {
   evaluateAllowedDoctorGroupRule,
+  evaluateDoctorExclusionRule,
   evaluateDutyDesignBlockedDayRule,
   evaluateInactiveDoctorRule,
   evaluateLeaveRule,
@@ -45,6 +46,15 @@ export function checkShiftEligibility(
       reasons.push(allowedGroupReason);
     }
 
+    const doctorExclusionReason = evaluateDoctorExclusionRule(
+      doctor,
+      input.shift,
+      input.excludedDoctorsByDate ?? new Map()
+    );
+    if (doctorExclusionReason) {
+      reasons.push(doctorExclusionReason);
+    }
+
     const oneShiftPerDayReason = evaluateOneShiftPerDayRule(
       doctor,
       input.shift,
@@ -66,6 +76,39 @@ export function checkShiftEligibility(
     }
 
     // TODO: Add operational override rules.
+    return {
+      doctorId: doctor.id,
+      isEligible: reasons.length === 0,
+      reasons
+    };
+  });
+}
+
+export function checkBiasEligibility(
+  input: CheckEligibilityInput
+): ReadonlyArray<EligibilityDecision> {
+  return input.doctors.map((doctor) => {
+    const reasons: string[] = [];
+
+    const inactiveReason = evaluateInactiveDoctorRule(doctor);
+    if (inactiveReason) {
+      reasons.push(inactiveReason);
+    }
+
+    const leaveReason = evaluateLeaveRule(doctor, input.shift, input.leaves);
+    if (leaveReason) {
+      reasons.push(leaveReason);
+    }
+
+    const doctorExclusionReason = evaluateDoctorExclusionRule(
+      doctor,
+      input.shift,
+      input.excludedDoctorsByDate ?? new Map()
+    );
+    if (doctorExclusionReason) {
+      reasons.push(doctorExclusionReason);
+    }
+
     return {
       doctorId: doctor.id,
       isEligible: reasons.length === 0,

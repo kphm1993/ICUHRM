@@ -3,7 +3,6 @@ import type {
   ExchangeRequest,
   ExchangeRequestStatus
 } from "@/domain/models";
-import { notImplemented } from "@/shared/lib/notImplemented";
 
 export interface CreateExchangeRequestInput {
   readonly rosterId: EntityId;
@@ -23,20 +22,19 @@ export interface ExchangeService {
   cancelExchangeRequest(requestId: EntityId): Promise<void>;
 }
 
-export function createExchangeServicePlaceholder(): ExchangeService {
-  return {
-    async listExchangeRequests() {
-      throw notImplemented("ExchangeService.listExchangeRequests");
-    },
-    async createExchangeRequest() {
-      throw notImplemented("ExchangeService.createExchangeRequest");
-    },
-    async respondToExchangeRequest() {
-      throw notImplemented("ExchangeService.respondToExchangeRequest");
-    },
-    async cancelExchangeRequest() {
-      throw notImplemented("ExchangeService.cancelExchangeRequest");
-    }
-  };
-}
+// TODO: Implement exchange functionality
+export const exchangeService: ExchangeService = {
+  async listExchangeRequests() {
+    throw new Error("Exchange functionality not yet implemented");
+  },
+  async createExchangeRequest() {
+    throw new Error("Exchange functionality not yet implemented");
+  },
+  async respondToExchangeRequest() {
+    throw new Error("Exchange functionality not yet implemented");
+  },
+  async cancelExchangeRequest() {
+    throw new Error("Exchange functionality not yet implemented");
+  }
+};
 

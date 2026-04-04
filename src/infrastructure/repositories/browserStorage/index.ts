@@ -1,6 +1,7 @@
 export * from "@/infrastructure/repositories/browserStorage/storage";
 export * from "@/infrastructure/repositories/browserStorage/LocalStorageDoctorRepository";
 export * from "@/infrastructure/repositories/browserStorage/LocalStorageDoctorGroupRepository";
+export * from "@/infrastructure/repositories/browserStorage/LocalStorageGroupConstraintTemplateRepository";
 export * from "@/infrastructure/repositories/browserStorage/LocalStorageShiftTypeRepository";
 export * from "@/infrastructure/repositories/browserStorage/LocalStorageDutyLocationRepository";
 export * from "@/infrastructure/repositories/browserStorage/LocalStorageBiasCriteriaRepository";

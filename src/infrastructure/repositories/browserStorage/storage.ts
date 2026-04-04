@@ -1,6 +1,7 @@
 export const STORAGE_KEYS = {
   doctors: "icu-hrm:v1:doctors",
   doctorGroups: "icu-hrm:v1:doctor-groups",
+  groupConstraintTemplates: "icu-hrm:v1:group-constraint-templates",
   shiftTypes: "icu-hrm:v1:shift-types",
   dutyLocations: "icu-hrm:v1:duty-locations",
   biasCriteria: "icu-hrm:v1:bias-criteria",

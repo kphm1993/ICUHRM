@@ -21,7 +21,10 @@ import type {
   GenerateRosterOutput,
   GeneratedShiftMetadata
 } from "@/domain/scheduling/contracts";
-import { checkShiftEligibility } from "@/domain/scheduling/checkEligibility";
+import {
+  checkBiasEligibility,
+  checkShiftEligibility
+} from "@/domain/scheduling/checkEligibility";
 import { addDays, parseIsoDate, toIsoDate } from "@/domain/scheduling/dateUtils";
 import { determineBiasCriteriaForShift } from "@/domain/scheduling/determineBiasCriteria";
 import { compareShiftsForAssignment } from "@/domain/scheduling/shiftClassification";
@@ -231,6 +234,7 @@ export function generateRoster(
   const shiftTypesById = indexEntriesById(input.shiftTypes);
   const dutyLocationsById = indexEntriesById(input.activeDutyLocations);
   const blockedDatesByDoctorId = new Map<EntityId, Set<ISODateString>>();
+  const excludedDoctorsByDate = input.excludedDoctorsByDate ?? new Map();
   let fairnessState = initializeFairnessWorkingState({
     doctors: input.doctors,
     criteriaIds: input.activeBiasCriteria.map((criteria) => criteria.id)
@@ -259,7 +263,7 @@ export function generateRoster(
   }
 
   for (const shift of shifts) {
-    const eligibility = checkShiftEligibility({
+    const eligibilityInput = {
       shift,
       doctors: input.doctors,
       leaves: input.leaves,
@@ -268,8 +272,10 @@ export function generateRoster(
       shiftMetadataById: shiftPool.shiftMetadataById,
       blockedDatesByDoctorId: getBlockedDatesSnapshot(blockedDatesByDoctorId),
       allowedDoctorGroupIdByDate: input.allowedDoctorGroupIdByDate,
+      excludedDoctorsByDate,
       weekendGroupSchedule: input.weekendGroupSchedule
-    });
+    };
+    const eligibility = checkShiftEligibility(eligibilityInput);
     const shiftType = shiftTypesById[shift.shiftTypeId] as ShiftType | undefined;
     const location = dutyLocationsById[shift.locationId] as DutyLocation | undefined;
 
@@ -295,9 +301,10 @@ export function generateRoster(
     });
     const matchingCriteriaIds = matchingCriteria.map((criteria) => criteria.id);
     criteriaIdsByShiftId.set(shift.id, matchingCriteriaIds);
+    const biasEligibility = checkBiasEligibility(eligibilityInput);
     fairnessState = recordEligibilityForShift(
       fairnessState,
-      eligibility,
+      biasEligibility,
       matchingCriteriaIds
     );
 
@@ -362,6 +369,7 @@ export function generateRoster(
     activeBiasCriteria: input.activeBiasCriteria,
     activeDutyLocations: input.activeDutyLocations,
     allowedDoctorGroupIdByDate: input.allowedDoctorGroupIdByDate,
+    excludedDoctorsByDate,
     weekendGroupSchedule: input.weekendGroupSchedule
   });
 

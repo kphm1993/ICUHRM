@@ -1,5 +1,7 @@
 export interface SchedulingScoreWeights {
   readonly criteriaBiasWeight: number;
+  readonly criteriaBiasPriorityConstant: number;
+  readonly criteriaBiasPriorityEpsilon: number;
   readonly criteriaAssignedWeight: number;
   readonly offRequestPenaltyWeight: number;
   readonly overallAssignedWeight: number;
@@ -20,6 +22,8 @@ export interface SchedulingEngineConfig {
 export const DEFAULT_SCHEDULING_ENGINE_CONFIG: SchedulingEngineConfig = {
   scoring: {
     criteriaBiasWeight: 10,
+    criteriaBiasPriorityConstant: 1,
+    criteriaBiasPriorityEpsilon: 0.0001,
     criteriaAssignedWeight: 6,
     offRequestPenaltyWeight: 4,
     overallAssignedWeight: 1

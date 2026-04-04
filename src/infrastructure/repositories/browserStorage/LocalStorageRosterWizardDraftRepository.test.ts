@@ -37,12 +37,34 @@ function createDraft(overrides: Partial<RosterWizardDraft> = {}): RosterWizardDr
         isHolidayOverride: false,
         createdAt: "2026-04-10T08:00:00.000Z",
         updatedAt: "2026-04-10T08:00:00.000Z"
+      },
+      {
+        id: "assignment-2",
+        date: "2026-06-12",
+        dutyDesignId: "design-holiday",
+        isHolidayOverride: true,
+        createdAt: "2026-04-10T08:00:00.000Z",
+        updatedAt: "2026-04-10T08:30:00.000Z"
       }
     ],
     manualShiftAssignments: overrides.manualShiftAssignments ?? [
       {
         shiftId: "shift-1",
         doctorId: "doctor-a"
+      }
+    ],
+    baseBiasSnapshot: overrides.baseBiasSnapshot ?? [
+      {
+        id: "bias-1",
+        doctorId: "doctor-a",
+        effectiveMonth: "2026-06",
+        balances: {
+          "criteria-day-all": -1
+        },
+        source: "ROSTER_GENERATION",
+        sourceReferenceId: "roster-prev",
+        updatedAt: "2026-04-10T08:00:00.000Z",
+        updatedByActorId: "system"
       }
     ],
     currentBiasSnapshot: overrides.currentBiasSnapshot ?? [

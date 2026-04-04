@@ -88,6 +88,20 @@ export function evaluateAllowedDoctorGroupRule(
     : "Doctor does not belong to the allowed group for this date.";
 }
 
+export function evaluateDoctorExclusionRule(
+  doctor: Pick<Doctor, "id">,
+  shift: Pick<Shift, "date">,
+  excludedDoctorsByDate: ReadonlyMap<string, ReadonlySet<EntityId>>
+): string | null {
+  const excludedDoctorIds = excludedDoctorsByDate.get(shift.date);
+
+  if (!excludedDoctorIds?.has(doctor.id)) {
+    return null;
+  }
+
+  return "Doctor is excluded from this date by a wizard planning rule.";
+}
+
 export function evaluateWeekendGroupRule(
   doctor: Pick<Doctor, "weekendGroup">,
   shift: Pick<Shift, "date" | "category" | "special">,

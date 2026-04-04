@@ -1,5 +1,6 @@
 export * from "@/infrastructure/repositories/inMemory/InMemoryDoctorRepository";
 export * from "@/infrastructure/repositories/inMemory/InMemoryDoctorGroupRepository";
+export * from "@/infrastructure/repositories/inMemory/InMemoryGroupConstraintTemplateRepository";
 export * from "@/infrastructure/repositories/inMemory/InMemoryShiftTypeRepository";
 export * from "@/infrastructure/repositories/inMemory/InMemoryDutyLocationRepository";
 export * from "@/infrastructure/repositories/inMemory/InMemoryBiasCriteriaRepository";

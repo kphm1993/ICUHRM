@@ -94,6 +94,16 @@ function compareCandidateScores(
   return 0;
 }
 
+function resolveCarriedBiasPriorityWeight(
+  bias: number,
+  input: ScoreCandidatesInput
+): number {
+  return Math.max(
+    input.config.scoring.criteriaBiasPriorityEpsilon,
+    -bias + input.config.scoring.criteriaBiasPriorityConstant
+  );
+}
+
 export function scoreCandidates(
   input: ScoreCandidatesInput
 ): ReadonlyArray<CandidateScore> {
@@ -117,7 +127,13 @@ export function scoreCandidates(
       const offRequestPenalty = resolveOffRequestPenalty(conflictingOffRequest, input);
       const criteriaBiasScore = matchedCriteriaIds.reduce((sum, criteriaId) => {
         const currentBias = biasEntry?.balances[criteriaId] ?? 0;
-        return sum + currentBias * input.config.scoring.criteriaBiasWeight;
+        const priorityWeight = resolveCarriedBiasPriorityWeight(currentBias, input);
+
+        return (
+          sum +
+          (input.config.scoring.criteriaBiasPriorityConstant - priorityWeight) *
+            input.config.scoring.criteriaBiasWeight
+        );
       }, 0);
       const criteriaAssignedCount = sumAssignedCountsForCriteria(
         fairnessLoad,
@@ -136,7 +152,7 @@ export function scoreCandidates(
       };
 
       const notes = [
-        "Primary fairness is scored from the matched active bias criteria for this shift.",
+        "Carried bias acts as a weighted priority signal across the matched active bias criteria for this shift.",
         "Lower scores win, then deterministic tie-breakers are applied."
       ];
 

@@ -52,6 +52,7 @@ function cloneDraft(draft: RosterWizardDraft): RosterWizardDraft {
     excludedDoctorPeriods: draft.excludedDoctorPeriods.map(cloneDoctorExclusionPeriod),
     dutyDesignAssignments: draft.dutyDesignAssignments.map(cloneDutyDesignAssignment),
     manualShiftAssignments: draft.manualShiftAssignments.map(cloneManualShiftAssignment),
+    baseBiasSnapshot: draft.baseBiasSnapshot.map(cloneBiasLedger),
     currentBiasSnapshot: draft.currentBiasSnapshot.map(cloneBiasLedger)
   };
 }

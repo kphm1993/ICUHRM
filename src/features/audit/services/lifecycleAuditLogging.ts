@@ -3,12 +3,14 @@ import type {
   DutyDesign,
   DutyDesignAssignment,
   EntityId,
+  GroupConstraintTemplate,
   RosterWizardDraft,
   RosterSnapshot,
   ShiftType
 } from "@/domain/models";
 import type { AuditActionType, AuditLogDetails } from "@/domain/models/AuditLog";
 import type { AuditLogService } from "@/features/audit/services/auditLogService";
+import { resolveRosterWizardEffectiveRange } from "@/features/roster/lib/rosterWizardStepOne";
 
 interface LifecycleActorInput {
   readonly actorId: EntityId;
@@ -35,6 +37,18 @@ function cloneDutyDesignAssignmentsMap(
       }
     ])
   );
+}
+
+function cloneDutyDesignAssignments(
+  assignments: ReadonlyArray<DutyDesignAssignment>
+): ReadonlyArray<DutyDesignAssignment> {
+  return assignments.map((assignment) => ({ ...assignment }));
+}
+
+function cloneManualShiftAssignments(
+  assignments: ReadonlyArray<import("@/domain/models").ManualShiftAssignment>
+): ReadonlyArray<import("@/domain/models").ManualShiftAssignment> {
+  return assignments.map((assignment) => ({ ...assignment }));
 }
 
 function cloneDutyDesignSnapshot(
@@ -384,6 +398,25 @@ export async function logDutyDesignAssignmentDeleted(
   });
 }
 
+export async function logGroupConstraintTemplateCreated(
+  auditLogService: AuditLogService,
+  input: LifecycleActorInput & {
+    readonly template: GroupConstraintTemplate;
+    readonly details: Readonly<Record<string, unknown>>;
+  }
+): Promise<void> {
+  await appendLifecycleAuditLog({
+    auditLogService,
+    actorId: input.actorId,
+    actorRole: input.actorRole,
+    actionType: "GROUP_CONSTRAINT_TEMPLATE_CREATED",
+    entityType: "GROUP_CONSTRAINT_TEMPLATE",
+    entityId: input.template.id,
+    details: input.details,
+    correlationId: input.correlationId
+  });
+}
+
 function buildRosterLifecycleDetails(snapshot: RosterSnapshot): AuditLogDetails {
   const activeBiasCriteria =
     snapshot.generatedInputSummary.activeBiasCriteria.map((criteria) => ({
@@ -492,17 +525,39 @@ export async function logRosterLifecycleEvent(
 function buildRosterWizardDraftDetails(
   draft: RosterWizardDraft
 ): AuditLogDetails {
+  const effectiveRange = resolveRosterWizardEffectiveRange({
+    rosterMonth: draft.rosterMonth,
+    customRange: draft.customRange
+  });
+
   return {
     name: draft.name,
     rosterMonth: draft.rosterMonth,
+    customRange: draft.customRange
+      ? {
+          startDate: draft.customRange.startDate,
+          endDate: draft.customRange.endDate
+        }
+      : null,
+    effectiveRange: {
+      startDate: effectiveRange.startDate,
+      endDate: effectiveRange.endDate
+    },
+    publicHolidayDates: [...draft.publicHolidayDates],
     currentStep: draft.currentStep,
     status: draft.status,
     publicHolidayDateCount: draft.publicHolidayDates.length,
+    groupConstraintTemplateIds: [...draft.groupConstraintTemplateIds],
     groupConstraintTemplateCount: draft.groupConstraintTemplateIds.length,
+    groupConstraints: draft.groupConstraints.map((constraint) => ({ ...constraint })),
     groupConstraintCount: draft.groupConstraints.length,
+    excludedDoctorPeriods: draft.excludedDoctorPeriods.map((period) => ({ ...period })),
     excludedDoctorPeriodCount: draft.excludedDoctorPeriods.length,
+    dutyDesignAssignments: cloneDutyDesignAssignments(draft.dutyDesignAssignments),
     dutyDesignAssignmentCount: draft.dutyDesignAssignments.length,
+    manualShiftAssignments: cloneManualShiftAssignments(draft.manualShiftAssignments),
     manualShiftAssignmentCount: draft.manualShiftAssignments.length,
+    baseBiasLedgerCount: draft.baseBiasSnapshot.length,
     currentBiasLedgerCount: draft.currentBiasSnapshot.length
   };
 }

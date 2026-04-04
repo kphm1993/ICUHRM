@@ -19,7 +19,22 @@ import {
 } from "@/infrastructure/repositories/browserStorage/storage";
 
 type StoredRosterWizardDraft = RosterWizardDraft &
-  Partial<Pick<RosterWizardDraft, "name" | "publicHolidayDates" | "groupConstraintTemplateIds" | "groupConstraints" | "excludedDoctorPeriods" | "dutyDesignAssignments" | "manualShiftAssignments" | "currentBiasSnapshot" | "status" | "currentStep">>;
+  Partial<
+    Pick<
+      RosterWizardDraft,
+      | "name"
+      | "publicHolidayDates"
+      | "groupConstraintTemplateIds"
+      | "groupConstraints"
+      | "excludedDoctorPeriods"
+      | "dutyDesignAssignments"
+      | "manualShiftAssignments"
+      | "baseBiasSnapshot"
+      | "currentBiasSnapshot"
+      | "status"
+      | "currentStep"
+    >
+  >;
 
 function cloneBiasLedger(entry: BiasLedger): BiasLedger {
   return {
@@ -80,6 +95,9 @@ function cloneDraft(draft: StoredRosterWizardDraft): RosterWizardDraft {
     ),
     manualShiftAssignments: (draft.manualShiftAssignments ?? []).map(
       cloneManualShiftAssignment
+    ),
+    baseBiasSnapshot: (draft.baseBiasSnapshot ?? draft.currentBiasSnapshot ?? []).map(
+      cloneBiasLedger
     ),
     currentBiasSnapshot: (draft.currentBiasSnapshot ?? []).map(cloneBiasLedger),
     status: draft.status ?? "DRAFT",
